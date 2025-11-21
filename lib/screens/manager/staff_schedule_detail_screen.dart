@@ -68,6 +68,7 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
     required ScheduleExceptionType type,
     String? shift,
     double penalty = 0.0, // <-- Thêm tham số này
+    double bonus = 0.0, // <-- Thêm tham số bonus
   }) async {
     try {
       await pbService.schedules.createScheduleException(
@@ -76,6 +77,7 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
         type: type,
         shift: shift,
         penalty: penalty, // <-- Truyền lên service
+        bonus: bonus,
       );
       if (mounted) _showSnackbar('Đã thêm ngoại lệ', Colors.green);
       _loadExceptions();
@@ -101,6 +103,7 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
         return AddExceptionDialog(
           onSave: _handleCreateException,
           initialDate: DateTime.now(),
+          defaultSchedule: widget.profile.defaultSchedule,
         );
       },
     );
@@ -342,7 +345,7 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
     );
   }
 
-  // --- ĐÃ CẬP NHẬT ĐỂ HIỂN THỊ ĐÚNG LOẠI + TIỀN PHẠT ---
+  // --- ĐÃ CẬP NHẬT ĐỂ HIỂN THỊ ĐÚNG LOẠI + TIỀN PHẠT + THƯỞNG ---
   Widget _buildExceptionsTab() {
     return Scaffold(
       body: RefreshIndicator(
@@ -433,6 +436,26 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
                             "-${formatCurrency(ex.penalty)}",
                             style: const TextStyle(
                               color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      if (ex.bonus > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Text(
+                            "+${formatCurrency(ex.bonus)}",
+                            style: const TextStyle(
+                              color: Colors.green,
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
                             ),

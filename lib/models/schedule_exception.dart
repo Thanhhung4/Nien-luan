@@ -1,12 +1,11 @@
-// [CẬP NHẬT FILE: lib/models/schedule_exception.dart]
-
+// [CẬP NHẬT: lib/models/schedule_exception.dart]
 import 'package:pocketbase/pocketbase.dart';
 
 enum ScheduleExceptionType {
-  absent, // Nghỉ có phép
-  extraShift, // Làm thêm
-  late, // Đi trễ (MỚI)
-  unexcused; // Nghỉ không phép (MỚI)
+  absent,
+  extraShift,
+  late,
+  unexcused;
 
   static ScheduleExceptionType fromString(String? typeString) {
     switch (typeString) {
@@ -34,7 +33,6 @@ enum ScheduleExceptionType {
     }
   }
 
-  // Text hiển thị tiếng Việt
   String get display {
     switch (this) {
       case ScheduleExceptionType.absent:
@@ -55,7 +53,8 @@ class ScheduleExceptionModel {
   final DateTime date;
   final ScheduleExceptionType type;
   final String? shift;
-  final double penalty; // (MỚI) Số tiền phạt
+  final double penalty;
+  final double bonus; // <-- MỚI: Lương làm thêm
 
   ScheduleExceptionModel({
     required this.id,
@@ -64,6 +63,7 @@ class ScheduleExceptionModel {
     required this.type,
     this.shift,
     this.penalty = 0.0,
+    this.bonus = 0.0, // <-- MỚI
   });
 
   factory ScheduleExceptionModel.fromRecord(RecordModel record) {
@@ -73,7 +73,8 @@ class ScheduleExceptionModel {
       date: DateTime.parse(record.getStringValue('date')).toLocal(),
       type: ScheduleExceptionType.fromString(record.getStringValue('type')),
       shift: record.getStringValue('shift'),
-      penalty: record.getDoubleValue('penalty'), // Lấy từ DB
+      penalty: record.getDoubleValue('penalty'),
+      bonus: record.getDoubleValue('bonus'), // <-- MỚI
     );
   }
 }
