@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:myshop/models/cart_item.dart';
 import 'package:myshop/models/menu_item.dart';
 import 'package:myshop/screens/auth/login_screen.dart';
@@ -7,6 +8,9 @@ import 'package:myshop/screens/employee/order_details_screen.dart';
 import 'package:myshop/screens/order/completed_orders_screen.dart';
 import 'package:myshop/services/pocketbase_service.dart';
 import 'package:myshop/utils/currency_formatter.dart';
+import '../../providers/cart_provider.dart';
+import '../../providers/menu_provider.dart';
+import '../../providers/auth_provider.dart';
 
 class EmployeeHome extends StatefulWidget {
   const EmployeeHome({super.key});
@@ -17,20 +21,20 @@ class EmployeeHome extends StatefulWidget {
 
 class _EmployeeHomeState extends State<EmployeeHome> {
   final PocketBaseService pbService = PocketBaseService.instance;
-  late Future<List<MenuItemModel>> _menuFuture;
 
   final TextEditingController _searchController = TextEditingController();
-  final Map<String, CartItem> _cart = {};
 
   String _searchQuery = '';
-  double _totalPrice = 0.0;
   bool _isProcessingOrder = false;
 
   @override
   void initState() {
     super.initState();
-    _menuFuture = pbService.menu.getMenu();
     _searchController.addListener(_onSearchChanged);
+    // Load menu khi vào trang
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<MenuProvider>().loadMenu();
+    });
   }
 
   @override
@@ -47,56 +51,21 @@ class _EmployeeHomeState extends State<EmployeeHome> {
   }
 
   Future<void> _refreshMenu() async {
-    setState(() {
-      _menuFuture = pbService.menu.getMenu();
-    });
-    try {
-      await _menuFuture;
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Lỗi tải thực đơn: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+    await context.read<MenuProvider>().refreshMenu();
   }
 
   void _incrementItem(MenuItemModel item) {
     if (!item.inStock) return;
-    setState(() {
-      if (_cart.containsKey(item.id)) {
-        _cart[item.id]!.quantity++;
-      } else {
-        _cart[item.id] = CartItem(item: item);
-      }
-      _calculateTotalPrice();
-    });
+    context.read<CartProvider>().addItem(item);
   }
 
   void _decrementItem(MenuItemModel item) {
-    setState(() {
-      if (!_cart.containsKey(item.id)) return;
-      if (_cart[item.id]!.quantity > 1) {
-        _cart[item.id]!.quantity--;
-      } else {
-        _cart.remove(item.id);
-      }
-      _calculateTotalPrice();
-    });
-  }
-
-  void _calculateTotalPrice() {
-    double total = 0.0;
-    for (final cartItem in _cart.values) {
-      total += cartItem.subtotal;
-    }
-    _totalPrice = total;
+    context.read<CartProvider>().removeItem(item.id);
   }
 
   Future<void> _processOrder() async {
-    if (_cart.isEmpty) {
+    final cartProvider = context.read<CartProvider>();
+    if (cartProvider.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Giỏ hàng đang trống. Vui lòng chọn món.'),
@@ -111,20 +80,18 @@ class _EmployeeHomeState extends State<EmployeeHome> {
         .push(
           MaterialPageRoute(
             builder: (context) =>
-                OrderDetailsScreen(cartItems: _cart.values.toList()),
+                OrderDetailsScreen(cartItems: cartProvider.cartItems),
           ),
         )
         .then((_) {
           // Sau khi quay về từ trang chi tiết, clear giỏ hàng
-          setState(() {
-            _cart.clear();
-            _totalPrice = 0.0;
-          });
+          cartProvider.clear();
         });
   }
 
   void _logout(BuildContext context) {
-    pbService.logout();
+    context.read<AuthProvider>().logout();
+    context.read<CartProvider>().clear(); // Clear cart khi logout
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const LoginScreen()),
       (Route<dynamic> route) => false,
@@ -144,6 +111,7 @@ class _EmployeeHomeState extends State<EmployeeHome> {
   }
 
   Future<void> _showAddNoteDialog(CartItem cartItem) async {
+    final cartProvider = context.read<CartProvider>();
     final noteController = TextEditingController(text: cartItem.notes);
     final newNote = await showDialog<String>(
       context: context,
@@ -173,9 +141,7 @@ class _EmployeeHomeState extends State<EmployeeHome> {
       ),
     );
     if (newNote != null) {
-      setState(() {
-        cartItem.notes = newNote;
-      });
+      cartProvider.updateNotes(cartItem.item.id, newNote);
     }
   }
 
@@ -183,7 +149,7 @@ class _EmployeeHomeState extends State<EmployeeHome> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Tạo hóa đơn"),
+        title: const Text("Trang chủ"),
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
         leading: IconButton(
@@ -208,14 +174,13 @@ class _EmployeeHomeState extends State<EmployeeHome> {
         children: [
           _buildSearchBar(),
           Expanded(
-            child: FutureBuilder<List<MenuItemModel>>(
-              future: _menuFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+            child: Consumer<MenuProvider>(
+              builder: (context, menuProvider, child) {
+                if (menuProvider.isLoading) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                if (snapshot.hasError) {
+                if (menuProvider.error != null) {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(20.0),
@@ -229,7 +194,7 @@ class _EmployeeHomeState extends State<EmployeeHome> {
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            'Lỗi tải thực đơn: ${snapshot.error}',
+                            'Lỗi tải thực đơn: ${menuProvider.error}',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.red.shade700,
@@ -248,7 +213,7 @@ class _EmployeeHomeState extends State<EmployeeHome> {
                   );
                 }
 
-                final menuItems = snapshot.data ?? [];
+                final menuItems = menuProvider.menuItems;
                 if (menuItems.isEmpty) {
                   return RefreshIndicator(
                     onRefresh: _refreshMenu,
@@ -271,13 +236,7 @@ class _EmployeeHomeState extends State<EmployeeHome> {
 
                 final filteredItems = _searchQuery.isEmpty
                     ? menuItems
-                    : menuItems
-                          .where(
-                            (item) => item.name.toLowerCase().contains(
-                              _searchQuery.toLowerCase(),
-                            ),
-                          )
-                          .toList();
+                    : menuProvider.searchItems(_searchQuery);
 
                 if (filteredItems.isEmpty) {
                   return const Center(
@@ -368,130 +327,142 @@ class _EmployeeHomeState extends State<EmployeeHome> {
   }
 
   Widget _buildMenuListView(List<MenuItemModel> items) {
-    return ListView.builder(
-      itemCount: items.length,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemBuilder: (context, index) {
-        final item = items[index];
-        final CartItem? cartItem = _cart[item.id];
-        final int quantityInCart = cartItem?.quantity ?? 0;
-        final String? note = cartItem?.notes;
-        final bool hasNote = note != null && note.isNotEmpty;
-        final bool isOutOfStock = !item.inStock;
+    return Consumer<CartProvider>(
+      builder: (context, cartProvider, child) {
+        return ListView.builder(
+          itemCount: items.length,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemBuilder: (context, index) {
+            final item = items[index];
+            final CartItem? cartItem = cartProvider.getItem(item.id);
+            final int quantityInCart = cartItem?.quantity ?? 0;
+            final String? note = cartItem?.notes;
+            final bool hasNote = note != null && note.isNotEmpty;
+            final bool isOutOfStock = !item.inStock;
 
-        return Card(
-          elevation: 2.0,
-          margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
-          color: isOutOfStock ? Colors.grey.shade200 : Colors.white,
-          child: ListTile(
-            leading: Opacity(
-              opacity: isOutOfStock ? 0.5 : 1.0,
-              child: (item.imageUrl != null)
-                  ? Image.network(
-                      item.imageUrl!,
-                      width: 50,
-                      height: 50,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          const Icon(Icons.broken_image, size: 50),
-                    )
-                  : const SizedBox(
-                      width: 50,
-                      height: 50,
-                      child: Icon(Icons.fastfood, color: Colors.grey),
-                    ),
-            ),
-            title: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    item.name,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      decoration: isOutOfStock
-                          ? TextDecoration.lineThrough
-                          : null,
-                      color: isOutOfStock ? Colors.grey : Colors.black,
-                    ),
-                  ),
+            return Card(
+              elevation: 2.0,
+              margin: const EdgeInsets.symmetric(
+                vertical: 4.0,
+                horizontal: 8.0,
+              ),
+              color: isOutOfStock ? Colors.grey.shade200 : Colors.white,
+              child: ListTile(
+                leading: Opacity(
+                  opacity: isOutOfStock ? 0.5 : 1.0,
+                  child: (item.imageUrl != null)
+                      ? Image.network(
+                          item.imageUrl!,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              const Icon(Icons.broken_image, size: 50),
+                        )
+                      : const SizedBox(
+                          width: 50,
+                          height: 50,
+                          child: Icon(Icons.fastfood, color: Colors.grey),
+                        ),
                 ),
-                if (isOutOfStock)
-                  Container(
-                    margin: const EdgeInsets.only(left: 8),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      "HẾT HÀNG",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          decoration: isOutOfStock
+                              ? TextDecoration.lineThrough
+                              : null,
+                          color: isOutOfStock ? Colors.grey : Colors.black,
+                        ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-            subtitle: Text(
-              '${formatCurrency(item.price)}${item.unit.isNotEmpty ? ' / ${item.unit}' : ''}'
-              '${hasNote ? '\nGhi chú: $note' : ''}',
-              style: TextStyle(color: hasNote ? Colors.deepPurple : null),
-            ),
-            isThreeLine: hasNote,
-            trailing: isOutOfStock
-                ? const SizedBox(width: 1)
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (quantityInCart > 0)
-                        IconButton(
-                          icon: Icon(
-                            Icons.edit_note,
-                            color: hasNote ? Colors.deepPurple : Colors.grey,
-                          ),
-                          onPressed: () => _showAddNoteDialog(cartItem!),
+                    if (isOutOfStock)
+                      Container(
+                        margin: const EdgeInsets.only(left: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
                         ),
-                      if (quantityInCart == 0)
-                        IconButton(
-                          icon: const Icon(
-                            Icons.add_shopping_cart,
-                            color: Colors.green,
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          "HẾT HÀNG",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
                           ),
-                          onPressed: () => _incrementItem(item),
-                        )
-                      else
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
+                        ),
+                      ),
+                  ],
+                ),
+                subtitle: Text(
+                  '${formatCurrency(item.price)}${item.unit.isNotEmpty ? ' / ${item.unit}' : ''}'
+                  '${hasNote ? '\nGhi chú: $note' : ''}',
+                  style: TextStyle(color: hasNote ? Colors.deepPurple : null),
+                ),
+                isThreeLine: hasNote,
+                trailing: isOutOfStock
+                    ? const SizedBox(width: 1)
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (quantityInCart > 0)
                             IconButton(
                               icon: Icon(
-                                Icons.remove,
-                                color: Colors.red.shade700,
+                                Icons.edit_note,
+                                color: hasNote
+                                    ? Colors.deepPurple
+                                    : Colors.grey,
                               ),
-                              onPressed: () => _decrementItem(item),
+                              onPressed: () => _showAddNoteDialog(cartItem!),
                             ),
-                            Text(
-                              '$quantityInCart',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                          if (quantityInCart == 0)
                             IconButton(
-                              icon: const Icon(Icons.add, color: Colors.green),
+                              icon: const Icon(
+                                Icons.add_shopping_cart,
+                                color: Colors.green,
+                              ),
                               onPressed: () => _incrementItem(item),
+                            )
+                          else
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.remove,
+                                    color: Colors.red.shade700,
+                                  ),
+                                  onPressed: () => _decrementItem(item),
+                                ),
+                                Text(
+                                  '$quantityInCart',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.add,
+                                    color: Colors.green,
+                                  ),
+                                  onPressed: () => _incrementItem(item),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                    ],
-                  ),
-          ),
+                        ],
+                      ),
+              ),
+            );
+          },
         );
       },
     );
@@ -504,57 +475,62 @@ class _EmployeeHomeState extends State<EmployeeHome> {
         child: const Center(child: CircularProgressIndicator()),
       );
     }
-    if (_cart.isEmpty) return const SizedBox.shrink();
 
-    final int totalItems = _cart.values.fold(
-      0,
-      (sum, item) => sum + item.quantity,
-    );
+    return Consumer<CartProvider>(
+      builder: (context, cartProvider, child) {
+        if (cartProvider.isEmpty) return const SizedBox.shrink();
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 5,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Tổng ($totalItems món):',
-                style: const TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-              Text(
-                formatCurrency(_totalPrice),
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.deepPurple,
-                ),
+        final int totalItems = cartProvider.itemCount;
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 5,
+                offset: const Offset(0, -2),
               ),
             ],
           ),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.check_circle),
-            label: const Text('Tạo hóa đơn'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            ),
-            onPressed: _processOrder,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tổng ($totalItems món):',
+                    style: const TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                  Text(
+                    formatCurrency(cartProvider.totalAmount),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.deepPurple,
+                    ),
+                  ),
+                ],
+              ),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.check_circle),
+                label: const Text('Tạo hóa đơn'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                ),
+                onPressed: _processOrder,
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

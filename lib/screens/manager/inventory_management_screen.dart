@@ -17,7 +17,6 @@ class InventoryManagementScreen extends StatefulWidget {
 class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
   final pbService = PocketBaseService.instance;
   late Future<List<Ingredient>> _ingredientsFuture;
-  final int _shelfLifeDays = 60; // Ngưỡng cảnh báo hết hạn mặc định
 
   @override
   void initState() {

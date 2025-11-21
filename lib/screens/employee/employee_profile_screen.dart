@@ -133,7 +133,7 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
           trailing: const Icon(Icons.chevron_right),
           onTap: _navigateToEditProfile,
         ),
-ListTile(
+        ListTile(
           leading: const Icon(Icons.calendar_month),
           title: const Text('Xem lịch làm việc'),
           trailing: const Icon(Icons.chevron_right),
@@ -159,18 +159,4 @@ ListTile(
   }
 
   bool get _isLoading => currentProfile == null && _error == null;
-}
-
-// (Class _PlaceholderScreen giữ nguyên)
-class _PlaceholderScreen extends StatelessWidget {
-  final String title;
-  const _PlaceholderScreen({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(child: Text('Đây là màn hình cho chức năng: $title')),
-    );
-  }
 }

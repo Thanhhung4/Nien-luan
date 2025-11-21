@@ -4,8 +4,6 @@ import 'package:pocketbase/pocketbase.dart';
 // Import các model mới
 import 'package:myshop/models/staff_profile.dart';
 import 'package:myshop/models/staff_role.dart';
-// Import model 'User' cũ (chỉ dùng cho hàm login)
-import 'package:myshop/models/user.dart';
 
 class UserService {
   final PocketBase pb;

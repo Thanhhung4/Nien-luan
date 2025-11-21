@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:provider/provider.dart';
 import 'dart:math';
 import '../../models/cart_item.dart';
 import '../../services/pocketbase_service.dart';
+import '../../providers/cart_provider.dart';
 
 class PaymentScreen extends StatefulWidget {
   final List<CartItem> cartItems;
@@ -127,6 +129,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
         );
       }
       print('All order items created');
+
+      // Clear cart thông qua Provider
+      if (mounted) {
+        context.read<CartProvider>().clear();
+        print('Cart cleared via Provider');
+      }
 
       // Hiển thị thông báo thành công (chỉ lưu, chưa in)
       if (mounted) {

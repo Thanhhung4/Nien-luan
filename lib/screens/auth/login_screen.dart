@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../services/pocketbase_service.dart';
+import '../../providers/auth_provider.dart';
 import '../employee/employee_home.dart';
 import '../manager/manager_home.dart';
 
@@ -50,44 +52,36 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => isLoading = true);
 
     try {
-      // 2. Gọi hàm login
-      final isSuccess = await pbService.login(
+      // 2. Thử đăng nhập thông qua AuthProvider
+      final authProvider = context.read<AuthProvider>();
+      final success = await authProvider.login(
         emailController.text,
         passwordController.text,
       );
 
-      if (!isSuccess) {
-        _showSnackbar(
-          'Đăng nhập thất bại: Email hoặc mật khẩu không chính xác.',
-          isError: true,
-        );
-        return;
-      }
+      if (success && authProvider.userRole != null) {
+        final userRole = authProvider.userRole!;
 
-      // 3. Lấy role và điều hướng (ĐÃ XÓA SNACKBAR THÀNH CÔNG)
-      final role = pbService.getRole();
-
-      if (role == 'employee') {
-        _navigateTo(const EmployeeHome());
-        // ĐÃ XÓA SNACKBAR Ở ĐÂY
-      } else if (role == 'manager') {
-        _navigateTo(const ManagerHome());
-        // ĐÃ XÓA SNACKBAR Ở ĐÂY
+        // 3. Điều hướng theo role
+        switch (userRole) {
+          case 'employee':
+            _navigateTo(const EmployeeHome());
+            break;
+          case 'manager':
+            _navigateTo(const ManagerHome());
+            break;
+          default:
+            _showSnackbar('Vai trò người dùng không hợp lệ.', isError: true);
+        }
       } else {
-        pbService.logout();
         _showSnackbar(
-          'Tài khoản có vai trò không xác định. Đã đăng xuất.',
+          'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.',
           isError: true,
         );
       }
     } catch (e) {
-      // 4. Xử lý lỗi (giữ nguyên, đã rất tốt)
-      _showSnackbar(
-        'Đăng nhập thất bại: Email hoặc mật khẩu không chính xác.',
-        isError: true,
-      );
+      _showSnackbar('Lỗi đăng nhập: $e', isError: true);
     } finally {
-      // 5. Tắt loading (ĐÃ XÓA FUTURE.DELAYED)
       if (mounted) {
         setState(() => isLoading = false);
       }

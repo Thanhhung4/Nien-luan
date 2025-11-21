@@ -37,8 +37,9 @@ class ReportService {
     final String endISO = endDate.toUtc().toIso8601String();
 
     try {
-      final filter =
-          'status = "paid" && created >= "$startISO" && created <= "$endISO"';
+      // Loại bỏ filter status vì đã không sử dụng thuộc tính status nữa
+      // Tất cả orders được tạo đều được coi là đã hoàn thành
+      final filter = 'created >= "$startISO" && created <= "$endISO"';
       final records = await pb
           .collection('orders')
           .getFullList(filter: filter, sort: 'created');
