@@ -51,7 +51,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       // 2. Gọi hàm login
-      await pbService.login(emailController.text, passwordController.text);
+      final isSuccess = await pbService.login(
+        emailController.text,
+        passwordController.text,
+      );
+
+      if (!isSuccess) {
+        _showSnackbar(
+          'Đăng nhập thất bại: Email hoặc mật khẩu không chính xác.',
+          isError: true,
+        );
+        return;
+      }
 
       // 3. Lấy role và điều hướng (ĐÃ XÓA SNACKBAR THÀNH CÔNG)
       final role = pbService.getRole();

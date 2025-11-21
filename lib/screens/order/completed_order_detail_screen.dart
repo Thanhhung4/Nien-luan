@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:myshop/models/order.dart'; // Thêm OrderStatus
 import 'package:myshop/services/pocketbase_service.dart';
 import 'package:myshop/utils/currency_formatter.dart';
 import 'package:myshop/models/order_item_view.dart';
@@ -59,15 +58,7 @@ class _CompletedOrderDetailScreenState
                 color: Colors.grey.shade700, // Màu xám cho ID
               ),
             ),
-            // --- KẾT THÚC PHẦN SỬA ---
             const Divider(),
-            _buildInfoRow(
-              'Trạng thái:',
-              widget.orderView.status.display,
-              color: widget.orderView.status == OrderStatus.paid
-                  ? Colors.green.shade700
-                  : Colors.orange.shade700,
-            ),
             _buildInfoRow(
               'Thời gian:',
               DateFormat(
@@ -148,7 +139,7 @@ class _CompletedOrderDetailScreenState
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: Text(
                 // Đã fix lỗi getter 'display' trong file order.dart trước đó
-                'Danh sách món ăn (${widget.orderView.status.display}):',
+                'Danh sách món ăn:',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: Theme.of(context).primaryColor,

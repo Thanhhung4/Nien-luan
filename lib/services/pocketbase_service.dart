@@ -2,13 +2,10 @@
 
 import 'package:pocketbase/pocketbase.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:intl/intl.dart';
 import 'package:myshop/models/table.dart';
 import 'package:myshop/models/menu_item.dart';
 import 'package:myshop/models/order.dart';
 import 'package:myshop/models/order_item_view.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
 import 'notification_service.dart';
 import 'schedule_service.dart';
 // Import các service con
@@ -94,18 +91,17 @@ class PocketBaseService {
   }
 
   // --- Chức Năng Tạo Hóa Đơn Mới ---
-  Future<String> createOrderRecord(String tableId, double totalPrice) async {
+  Future<String> createOrderRecord(double totalPrice, {String? tableId}) async {
     try {
-      final record = await pb
-          .collection('orders')
-          .create(
-            body: {
-              'table': tableId,
-              'total_price': totalPrice,
-              'status': 'pending',
-              'created_by': pb.authStore.record?.id,
-            },
-          );
+      final body = {
+        'total_price': totalPrice,
+        'created_by': pb.authStore.record?.id,
+      };
+      if (tableId != null && tableId.isNotEmpty) {
+        body['table'] = tableId;
+      }
+
+      final record = await pb.collection('orders').create(body: body);
       return record.id;
     } catch (e) {
       print('Error creating order record: $e');
@@ -144,7 +140,7 @@ class PocketBaseService {
     try {
       final record = await pb
           .collection('orders')
-          .getFirstListItem('table = "$tableId" && status = "pending"');
+          .getFirstListItem('table = "$tableId"');
       return OrderModel.fromRecord(record);
     } on ClientException catch (e) {
       if (e.statusCode == 404) {
@@ -213,10 +209,7 @@ class PocketBaseService {
   // --- SỬA HÀM NÀY (TẠM THỜI VÔ HIỆU HÓA TRỪ KHO) ---
   Future<void> checkoutOrder(String orderId, String tableId) async {
     try {
-      // 1. Đánh dấu đơn hàng là "paid"
-      await pb.collection('orders').update(orderId, body: {'status': 'paid'});
-
-      // 2. Chuyển bàn về "trống"
+      // Chuyển bàn về "trống"
       await pb.collection('tables').update(tableId, body: {'status': 'empty'});
 
       // 3. (MỚI) Tự động trừ kho
@@ -285,7 +278,6 @@ class PocketBaseService {
       final endFilter = endDateTimeLocal.toUtc().toIso8601String();
 
       List<String> filters = [
-        'status = "paid"',
         'created >= \'$startFilter\'',
         'created <= \'$endFilter\'',
       ];
@@ -302,15 +294,23 @@ class PocketBaseService {
           .getFullList(
             filter: filterString,
             sort: '-created',
-            expand: 'table,created_by',
+            expand: 'created_by',
           );
+
+      print('Found ${records.length} paid orders');
 
       return records.map((record) {
         RecordModel? tableRecord;
-        final tableExpand = record.get<List<RecordModel>>('expand.table');
-        if (tableExpand.isNotEmpty) {
-          tableRecord = tableExpand.first;
+        // Thử lấy table record nếu có, không expand vì có thể null
+        final tableId = record.getStringValue('table');
+        if (tableId.isNotEmpty) {
+          try {
+            // Có thể cần lấy table riêng nếu cần
+          } catch (e) {
+            print('Could not fetch table for order ${record.id}: $e');
+          }
         }
+
         RecordModel? creatorRecord;
         final creatorExpand = record.get<List<RecordModel>>(
           'expand.created_by',
