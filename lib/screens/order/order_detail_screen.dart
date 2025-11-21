@@ -1,20 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:myshop/models/cart_item.dart';
 import 'package:myshop/models/table.dart';
 import 'package:myshop/models/menu_item.dart';
 import 'package:myshop/models/order.dart';
 import 'package:myshop/services/pocketbase_service.dart';
 import 'package:myshop/utils/currency_formatter.dart';
 import 'package:myshop/models/order_item_view.dart';
-
-class CartItem {
-  final MenuItemModel item;
-  int quantity;
-  String? notes;
-
-  CartItem({required this.item, this.quantity = 1, this.notes});
-
-  double get subtotal => item.price * quantity;
-}
 
 class OrderDetailScreen extends StatefulWidget {
   final TableModel table;
@@ -191,8 +182,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         await pbService.updateOrderTotalPrice(orderId, newTotal);
       } else {
         orderId = await pbService.createOrderRecord(
-          widget.table.id,
           _totalPrice,
+          tableId: widget.table.id,
         );
         for (final cartItem in _cart.values) {
           await pbService.createOrderItemRecord(

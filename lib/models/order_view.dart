@@ -1,13 +1,11 @@
 // *** MODEL VIEW CHO HÓA ĐƠN HOÀN THÀNH (Nên chuyển ra file riêng) ***
 // LƯU Ý: Lớp này nên được chuyển sang file riêng (ví dụ: lib/models/order_view.dart)
 import 'package:pocketbase/pocketbase.dart';
-import 'order.dart'; // Giả định bạn có model Order trong file này
 
 class OrderViewModel {
   final String id;
   final String tableId;
   final String tableName; // Tên bàn
-  final OrderStatus status;
   final double totalPrice;
   final String createdById;
   final String createdByUsername; // Thêm tên người tạo hóa đơn
@@ -18,7 +16,6 @@ class OrderViewModel {
     required this.id,
     required this.tableId,
     required this.tableName,
-    required this.status,
     required this.totalPrice,
     required this.createdById,
     required this.createdByUsername, // Cập nhật Constructor
@@ -38,8 +35,7 @@ class OrderViewModel {
     return OrderViewModel(
       id: record.id,
       tableId: record.getStringValue('table'),
-      tableName: tableRecord?.getStringValue('name') ?? 'N/A',
-      status: OrderStatus.fromString(record.getStringValue('status')),
+      tableName: tableRecord?.getStringValue('name') ?? 'Tại quán',
       totalPrice: record.getDoubleValue('total_price'),
       createdById: record.getStringValue('created_by'),
 
