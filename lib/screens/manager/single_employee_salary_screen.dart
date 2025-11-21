@@ -1,4 +1,4 @@
-// [FILE MỚI: lib/screens/manager/single_employee_salary_screen.dart]
+// [CẬP NHẬT FILE: lib/screens/manager/single_employee_salary_screen.dart]
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -64,7 +64,7 @@ class _SingleEmployeeSalaryScreenState
     _loadData();
   }
 
-  // --- LOGIC TÍNH CÔNG ---
+  // --- LOGIC TÍNH CÔNG (ĐÃ CẬP NHẬT) ---
   Map<String, dynamic> _calculateStats(
     List<ScheduleExceptionModel> exceptions,
   ) {
@@ -75,11 +75,11 @@ class _SingleEmployeeSalaryScreenState
     ).day;
     int standardWorkDays = 0; // Số ngày lẽ ra phải làm theo lịch
     int actualWorkDays = 0; // Số ngày thực tế đi làm
-    int daysOff = 0; // Số ngày nghỉ (có phép + không phép + ngày nghỉ lịch)
+    int daysOff = 0; // Số ngày nghỉ (CHỈ TÍNH: Có lịch nhưng nghỉ)
     double totalPenalty = 0;
     int lateCount = 0;
 
-    // 1. Duyệt qua từng ngày trong tháng để tính công chuẩn
+    // 1. Duyệt qua từng ngày trong tháng
     for (int i = 1; i <= totalDaysInMonth; i++) {
       final date = DateTime(_selectedMonth.year, _selectedMonth.month, i);
       final weekdayKey = _weekdayMap[date.weekday];
@@ -92,7 +92,6 @@ class _SingleEmployeeSalaryScreenState
         standardWorkDays++;
 
         // Kiểm tra xem có xin nghỉ (exception) vào ngày này không
-        // Tìm exception khớp ngày
         final ex = exceptions.firstWhere(
           (e) =>
               isSameDay(e.date, date) &&
@@ -107,19 +106,19 @@ class _SingleEmployeeSalaryScreenState
         );
 
         if (ex.id.isNotEmpty) {
-          // Có ngoại lệ nghỉ -> Không tính công
+          // Có lịch nhưng Nghỉ -> Tăng số ngày nghỉ
           daysOff++;
           if (ex.type == ScheduleExceptionType.unexcused) {
             totalPenalty += ex.penalty;
           }
         } else {
-          // Không nghỉ -> Có đi làm
+          // Có lịch và Không nghỉ -> Có đi làm
           actualWorkDays++;
         }
       } else {
-        // Ngày nghỉ theo lịch
-        daysOff++;
-        // Check nếu có làm thêm (extraShift)
+        // Ngày nghỉ theo lịch (Ví dụ: Chủ Nhật không có lịch) -> KHÔNG TÍNH VÀO daysOff
+
+        // Check nếu có làm thêm (extraShift) vào ngày nghỉ
         final ex = exceptions.firstWhere(
           (e) =>
               isSameDay(e.date, date) &&
@@ -133,7 +132,6 @@ class _SingleEmployeeSalaryScreenState
         );
         if (ex.id.isNotEmpty && ex.date.year != 1900) {
           actualWorkDays++; // Tính là đi làm (làm thêm)
-          daysOff--; // Giảm ngày nghỉ xuống
         }
       }
     }
@@ -289,8 +287,9 @@ class _SingleEmployeeSalaryScreenState
                             ),
                             const Divider(),
                             _buildRow(
-                              "Số ngày nghỉ",
+                              "Số ngày nghỉ (vắng)",
                               "${stats['offDays']} ngày",
+                              color: Colors.orange,
                             ),
                           ],
                         ),
@@ -335,7 +334,9 @@ class _SingleEmployeeSalaryScreenState
                                     "${DateFormat('dd/MM').format(e.date)} - ${e.type.display}",
                                   ),
                                   trailing: Text(
-                                    "-${formatCurrency(e.penalty)}",
+                                    e.penalty > 0
+                                        ? "-${formatCurrency(e.penalty)}"
+                                        : "0đ",
                                     style: const TextStyle(color: Colors.red),
                                   ),
                                 ),
