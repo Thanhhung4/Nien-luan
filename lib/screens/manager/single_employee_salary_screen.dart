@@ -329,10 +329,6 @@ class _SingleEmployeeSalaryScreenState
                         padding: const EdgeInsets.all(16.0),
                         child: Column(
                           children: [
-                            _buildRow(
-                              "Số lần đi trễ",
-                              "${stats['lateCount']} lần",
-                            ),
                             const Divider(height: 24),
                             const Align(
                               alignment: Alignment.centerLeft,

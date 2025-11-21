@@ -1,39 +1,72 @@
+// [CẬP NHẬT FILE: lib/services/notification_service.dart]
+
 import 'package:pocketbase/pocketbase.dart';
-import 'package:myshop/models/notification.dart'; // Import model mới
+import 'package:myshop/models/notification.dart';
 
 class NotificationService {
   final PocketBase pb;
 
   NotificationService(this.pb);
 
-  /// Lấy danh sách thông báo (mới nhất xếp trước)
-  /// Dùng cho cả nhân viên và quản lý
+  // Lấy danh sách
   Future<List<NotificationModel>> getNotifications() async {
     try {
       final records = await pb
           .collection('notifications')
-          .getFullList(
-            sort: '-created', // Mới nhất lên đầu
-          );
+          .getFullList(sort: '-created');
       return records.map((r) => NotificationModel.fromRecord(r)).toList();
     } catch (e) {
-      print('NotificationService - Error fetching notifications: $e');
+      print('Error fetching notifications: $e');
       throw Exception('Failed to load notifications: $e');
     }
   }
 
-  /// Tạo một thông báo mới (chỉ dùng cho Quản lý)
+  // Tạo mới
   Future<void> createNotification({
     required String title,
-    required String content,
+    required String content, // Dùng content
   }) async {
     try {
       await pb
           .collection('notifications')
-          .create(body: {'title': title, 'content': content});
+          .create(
+            body: {
+              'title': title,
+              'content': content, // Dùng content
+            },
+          );
     } catch (e) {
-      print('NotificationService - Error creating notification: $e');
       throw Exception('Failed to create notification: $e');
+    }
+  }
+
+  // --- HÀM MỚI: CẬP NHẬT ---
+  Future<void> updateNotification({
+    required String id,
+    required String title,
+    required String content, // Dùng content
+  }) async {
+    try {
+      await pb
+          .collection('notifications')
+          .update(
+            id,
+            body: {
+              'title': title,
+              'content': content, // Dùng content
+            },
+          );
+    } catch (e) {
+      throw Exception('Failed to update notification: $e');
+    }
+  }
+
+  // --- HÀM MỚI: XÓA ---
+  Future<void> deleteNotification(String id) async {
+    try {
+      await pb.collection('notifications').delete(id);
+    } catch (e) {
+      throw Exception('Failed to delete notification: $e');
     }
   }
 }

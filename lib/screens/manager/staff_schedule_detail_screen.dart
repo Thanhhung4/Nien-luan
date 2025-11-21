@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:myshop/models/schedule_exception.dart';
 import 'package:myshop/models/staff_profile.dart';
+import 'package:myshop/models/staff_role.dart'; // <-- Import để check Role
 import 'package:myshop/services/pocketbase_service.dart';
 import 'package:myshop/widgets/manager/add_exception_dialog.dart';
-import 'package:myshop/utils/currency_formatter.dart';
+import 'package:myshop/utils/currency_formatter.dart'; // <-- Import để format tiền
 
 // Định nghĩa các hằng số cho form
 const List<String> _allWorkDays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -26,14 +27,14 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
     with SingleTickerProviderStateMixin {
   final pbService = PocketBaseService.instance;
 
+  // State cho Tab Ngoại lệ
   late Future<List<ScheduleExceptionModel>> _exceptionsFuture;
-
-  // Biến lưu danh sách exception để truyền vào Dialog check trùng
-  List<ScheduleExceptionModel> _currentExceptions = [];
-
-  final DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
+  final DateTime _startDate = DateTime.now().subtract(
+    const Duration(days: 30),
+  ); // Load rộng ra xíu
   final DateTime _endDate = DateTime.now().add(const Duration(days: 60));
 
+  // State cho Tab Lịch Cố Định
   final _formKey = GlobalKey<FormState>();
   late Map<String, Set<String>> _scheduleMap;
   bool _isSavingSchedule = false;
@@ -53,16 +54,11 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
   Future<void> _loadExceptions() async {
     if (mounted) {
       setState(() {
-        _exceptionsFuture = pbService.schedules
-            .getScheduleExceptions(
-              staffProfileId: widget.profile.id,
-              startDate: _startDate,
-              endDate: _endDate,
-            )
-            .then((value) {
-              _currentExceptions = value; // Lưu lại list để dùng
-              return value;
-            });
+        _exceptionsFuture = pbService.schedules.getScheduleExceptions(
+          staffProfileId: widget.profile.id,
+          startDate: _startDate,
+          endDate: _endDate,
+        );
       });
     }
   }
@@ -104,21 +100,24 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
     showDialog(
       context: context,
       builder: (context) {
-        return AddExceptionDialog(
-          onSave: _handleCreateException,
-          initialDate: DateTime.now(),
-          defaultSchedule: widget.profile.defaultSchedule,
-          existingExceptions:
-              _currentExceptions, // <-- TRUYỀN DANH SÁCH HIỆN CÓ VÀO
+        return FutureBuilder<List<ScheduleExceptionModel>>(
+          future: _exceptionsFuture,
+          builder: (context, snapshot) {
+            final existingExceptions = snapshot.data ?? [];
+            return AddExceptionDialog(
+              onSave: _handleCreateException,
+              initialDate: DateTime.now(),
+              defaultSchedule: widget.profile.defaultSchedule,
+              existingExceptions:
+                  existingExceptions, // <-- bổ sung tham số bắt buộc
+            );
+          },
         );
       },
     );
   }
 
-  // ... (Phần còn lại của file: _saveDefaultSchedule, _showSnackbar, build, v.v... GIỮ NGUYÊN)
-  // Bạn giữ nguyên phần code hiển thị UI và Table lịch bên dưới nhé, chỉ thay đổi phần showAddDialog ở trên.
-
-  // --- (Code copy lại để đảm bảo file hoàn chỉnh) ---
+  // --- HÀM LƯU LỊCH & TÍNH LƯƠNG TỰ ĐỘNG (ĐÃ KHÔI PHỤC) ---
   Future<void> _saveDefaultSchedule() async {
     if (_formKey.currentState?.validate() ?? false) {
       setState(() {
@@ -126,17 +125,43 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
       });
 
       final Map<String, List<String>> scheduleToSave = {};
+      int totalShiftsPerWeek = 0;
+
+      // 1. Chuẩn bị dữ liệu lịch & Đếm số ca
       _scheduleMap.forEach((day, shiftsSet) {
-        scheduleToSave[day] = shiftsSet.toList()..sort();
+        final shiftsList = shiftsSet.toList()..sort();
+        scheduleToSave[day] = shiftsList;
+        totalShiftsPerWeek += shiftsList.length;
       });
 
-      try {
-        await pbService.users.updateStaffDefaultSchedule(
-          profileId: widget.profile.id,
-          defaultSchedule: scheduleToSave,
-        );
+      // 2. Tính lương tự động
+      double ratePerShift = 100000; // Mặc định 100k
+      if (widget.profile.role == StaffRole.chef) {
+        ratePerShift = 200000; // Bếp trưởng 200k
+      }
 
-        if (mounted) _showSnackbar('Đã lưu lịch cố định!', Colors.green);
+      // Công thức: (Số ca 1 tuần * 4 tuần) * Đơn giá
+      double newCalculatedSalary = (totalShiftsPerWeek * 4) * ratePerShift;
+
+      try {
+        // 3. Cập nhật vào Database (Cả Lịch và Lương)
+        // Lưu ý: 'default_schedules' là tên trường trong DB của bạn
+        await pbService.users.pb
+            .collection('staff_profiles')
+            .update(
+              widget.profile.id,
+              body: {
+                'default_schedules': scheduleToSave,
+                'salary': newCalculatedSalary,
+              },
+            );
+
+        if (mounted) {
+          _showSnackbar(
+            'Đã lưu! Lương cứng mới: ${formatCurrency(newCalculatedSalary)}',
+            Colors.green,
+          );
+        }
       } catch (e) {
         if (mounted) _showSnackbar('Lỗi lưu lịch: $e', Colors.red);
       } finally {
@@ -262,7 +287,9 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
                     )
                   : const Icon(Icons.save),
               label: Text(
-                _isSavingSchedule ? 'Đang lưu...' : 'Lưu Lịch Cố Định',
+                _isSavingSchedule
+                    ? 'Đang tính lương & Lưu...'
+                    : 'Lưu Lịch Cố Định',
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.teal,
@@ -293,12 +320,13 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
           ),
         ),
         ..._allShifts.map((shift) {
+          String shortShift = shift.replaceAll('Ca ', '');
           return TableCell(
             verticalAlignment: TableCellVerticalAlignment.middle,
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 22.0),
-                child: Text(shift.replaceAll('Ca ', ''), style: headerStyle),
+                child: Text(shortShift, style: headerStyle),
               ),
             ),
           );
@@ -309,6 +337,7 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
 
   TableRow _buildDayScheduleRow(String day) {
     bool? selectAllState = _getSelectAllStateForDay(day);
+
     return TableRow(
       children: [
         TableCell(
@@ -326,7 +355,9 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
               Checkbox(
                 value: selectAllState,
                 tristate: true,
-                onChanged: (val) => _toggleAllShiftsForDay(day, val),
+                onChanged: (bool? val) {
+                  _toggleAllShiftsForDay(day, val);
+                },
                 activeColor: Colors.teal,
               ),
             ],
@@ -339,7 +370,9 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
             child: Center(
               child: Checkbox(
                 value: isSelected,
-                onChanged: (val) => _toggleShift(day, shift, val),
+                onChanged: (bool? val) {
+                  _toggleShift(day, shift, val);
+                },
                 activeColor: Colors.teal,
               ),
             ),
@@ -356,12 +389,14 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
         child: FutureBuilder<List<ScheduleExceptionModel>>(
           future: _exceptionsFuture,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting)
+            if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
-            if (snapshot.hasError)
+            }
+            if (snapshot.hasError) {
               return Center(child: Text('Lỗi: ${snapshot.error}'));
+            }
             final exceptions = snapshot.data ?? [];
-            if (exceptions.isEmpty)
+            if (exceptions.isEmpty) {
               return Stack(
                 children: [
                   ListView(),
@@ -373,15 +408,17 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
                   ),
                 ],
               );
-
+            }
             return ListView.separated(
               itemCount: exceptions.length,
               separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final ex = exceptions[index];
+
                 IconData icon;
                 Color color;
                 String titleText = ex.type.display;
+
                 switch (ex.type) {
                   case ScheduleExceptionType.extraShift:
                     icon = Icons.more_time;
@@ -401,6 +438,7 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
                     color = Colors.red;
                     break;
                 }
+
                 return ListTile(
                   leading: CircleAvatar(
                     backgroundColor: color.withOpacity(0.1),

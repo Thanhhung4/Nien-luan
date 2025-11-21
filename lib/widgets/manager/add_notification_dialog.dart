@@ -1,13 +1,21 @@
-import 'package:flutter/material.dart';
+// [CẬP NHẬT FILE: lib/widgets/manager/add_notification_dialog.dart]
 
-// Định nghĩa kiểu callback
-typedef OnAddNotificationCallback =
+import 'package:flutter/material.dart';
+import 'package:myshop/models/notification.dart';
+
+// Đổi tên callback cho tổng quát
+typedef OnSaveNotificationCallback =
     Future<void> Function(String title, String content);
 
 class AddNotificationDialog extends StatefulWidget {
-  final OnAddNotificationCallback onAdd;
+  final OnSaveNotificationCallback onSave;
+  final NotificationModel? notification; // Nhận vào để sửa
 
-  const AddNotificationDialog({super.key, required this.onAdd});
+  const AddNotificationDialog({
+    super.key,
+    required this.onSave,
+    this.notification,
+  });
 
   @override
   State<AddNotificationDialog> createState() => _AddNotificationDialogState();
@@ -15,9 +23,21 @@ class AddNotificationDialog extends StatefulWidget {
 
 class _AddNotificationDialogState extends State<AddNotificationDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _contentController = TextEditingController();
+  late TextEditingController _titleController;
+  late TextEditingController _contentController;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Điền dữ liệu cũ nếu đang sửa
+    _titleController = TextEditingController(
+      text: widget.notification?.title ?? '',
+    );
+    _contentController = TextEditingController(
+      text: widget.notification?.content ?? '',
+    );
+  }
 
   @override
   void dispose() {
@@ -28,20 +48,17 @@ class _AddNotificationDialogState extends State<AddNotificationDialog> {
 
   Future<void> _submit() async {
     if (_formKey.currentState?.validate() ?? false) {
-      setState(() {
-        _isLoading = true;
-      });
-
+      setState(() => _isLoading = true);
       try {
-        // Gọi hàm service đã được truyền vào
-        await widget.onAdd(_titleController.text, _contentController.text);
-        if (mounted) Navigator.of(context).pop(); // Đóng dialog nếu thành công
+        await widget.onSave(
+          _titleController.text.trim(),
+          _contentController.text.trim(),
+        );
+        if (mounted) Navigator.of(context).pop();
       } catch (e) {
-        // Lỗi sẽ được xử lý ở màn hình chính, chỉ cần tắt loading
         if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
+          // Chỉ tắt loading để màn hình cha hiện snackbar
+          setState(() => _isLoading = false);
         }
       }
     }
@@ -49,8 +66,10 @@ class _AddNotificationDialogState extends State<AddNotificationDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isEditing = widget.notification != null;
+
     return AlertDialog(
-      title: const Text('Gửi Thông báo Mới'),
+      title: Text(isEditing ? 'Sửa Thông báo' : 'Gửi Thông báo Mới'),
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
@@ -63,12 +82,9 @@ class _AddNotificationDialogState extends State<AddNotificationDialog> {
                   labelText: 'Tiêu đề*',
                   border: OutlineInputBorder(),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Vui lòng nhập tiêu đề';
-                  }
-                  return null;
-                },
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Vui lòng nhập tiêu đề'
+                    : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -79,12 +95,9 @@ class _AddNotificationDialogState extends State<AddNotificationDialog> {
                   alignLabelWithHint: true,
                 ),
                 maxLines: 5,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Vui lòng nhập nội dung';
-                  }
-                  return null;
-                },
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Vui lòng nhập nội dung'
+                    : null,
               ),
             ],
           ),
@@ -103,7 +116,7 @@ class _AddNotificationDialogState extends State<AddNotificationDialog> {
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Gửi'),
+              : Text(isEditing ? 'Cập nhật' : 'Gửi'),
         ),
       ],
     );
