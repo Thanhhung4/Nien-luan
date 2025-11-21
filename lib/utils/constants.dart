@@ -14,3 +14,21 @@ const List<String> MENU_ITEM_UNITS = [
   'Dĩa',
   // Thêm các đơn vị khác của bạn vào đây
 ];
+
+// Đơn vị cho nguyên vật liệu
+const List<String> INGREDIENT_UNITS = [
+  'Kg',
+  'g',
+  'Lít',
+  'ml',
+  'Thùng',
+  'Bao',
+  'Chai',
+  'Hộp',
+  'Gói',
+  'Cây',
+  'Quả',
+  'Củ',
+  'Bó',
+  // Thêm các đơn vị nguyên vật liệu khác
+];
