@@ -23,7 +23,6 @@ class _SingleEmployeeSalaryScreenState
   DateTime _selectedMonth = DateTime.now();
   late Future<List<ScheduleExceptionModel>> _exceptionsFuture;
 
-  // Map để mapping thứ trong tuần
   final Map<int, String> _weekdayMap = {
     1: 'T2',
     2: 'T3',
@@ -64,7 +63,7 @@ class _SingleEmployeeSalaryScreenState
     _loadData();
   }
 
-  // --- LOGIC TÍNH CÔNG (ĐÃ CẬP NHẬT) ---
+  // --- LOGIC TÍNH CÔNG & THỐNG KÊ ---
   Map<String, dynamic> _calculateStats(
     List<ScheduleExceptionModel> exceptions,
   ) {
@@ -73,74 +72,53 @@ class _SingleEmployeeSalaryScreenState
       _selectedMonth.month + 1,
       0,
     ).day;
-    int standardWorkDays = 0; // Số ngày lẽ ra phải làm theo lịch
-    int actualWorkDays = 0; // Số ngày thực tế đi làm
-    int daysOff = 0; // Số ngày nghỉ (CHỈ TÍNH: Có lịch nhưng nghỉ)
-    double totalPenalty = 0;
-    int lateCount = 0;
 
-    // 1. Duyệt qua từng ngày trong tháng
-    for (int i = 1; i <= totalDaysInMonth; i++) {
-      final date = DateTime(_selectedMonth.year, _selectedMonth.month, i);
-      final weekdayKey = _weekdayMap[date.weekday];
+    int standardWorkDays = 0; // Công chuẩn
+    int actualWorkDays = 0; // Thực tế đi làm (theo lịch)
+    int daysOff = 0; // Số ngày nghỉ (trên lịch)
+    int extraShiftDays = 0; // MỚI: Số ngày làm thêm
+    double totalPenalty = 0; // Tổng phạt
+    int lateCount = 0; // Số lần trễ
+    double totalBonus = 0; // Tổng thưởng
 
-      // Kiểm tra xem ngày này có trong lịch cố định không
-      final shifts = widget.profile.defaultSchedule[weekdayKey] ?? [];
-      bool isScheduled = shifts.isNotEmpty;
-
-      if (isScheduled) {
-        standardWorkDays++;
-
-        // Kiểm tra xem có xin nghỉ (exception) vào ngày này không
-        final ex = exceptions.firstWhere(
-          (e) =>
-              isSameDay(e.date, date) &&
-              (e.type == ScheduleExceptionType.absent ||
-                  e.type == ScheduleExceptionType.unexcused),
-          orElse: () => ScheduleExceptionModel(
-            id: '',
-            staffProfileId: '',
-            date: DateTime(1900),
-            type: ScheduleExceptionType.extraShift,
-          ), // Dummy
-        );
-
-        if (ex.id.isNotEmpty) {
-          // Có lịch nhưng Nghỉ -> Tăng số ngày nghỉ
-          daysOff++;
-          if (ex.type == ScheduleExceptionType.unexcused) {
-            totalPenalty += ex.penalty;
-          }
-        } else {
-          // Có lịch và Không nghỉ -> Có đi làm
-          actualWorkDays++;
-        }
-      } else {
-        // Ngày nghỉ theo lịch (Ví dụ: Chủ Nhật không có lịch) -> KHÔNG TÍNH VÀO daysOff
-
-        // Check nếu có làm thêm (extraShift) vào ngày nghỉ
-        final ex = exceptions.firstWhere(
-          (e) =>
-              isSameDay(e.date, date) &&
-              e.type == ScheduleExceptionType.extraShift,
-          orElse: () => ScheduleExceptionModel(
-            id: '',
-            staffProfileId: '',
-            date: DateTime(1900),
-            type: ScheduleExceptionType.extraShift,
-          ),
-        );
-        if (ex.id.isNotEmpty && ex.date.year != 1900) {
-          actualWorkDays++; // Tính là đi làm (làm thêm)
-        }
-      }
-    }
-
-    // 2. Tính tiền phạt đi trễ (Late không ảnh hưởng ngày công, chỉ trừ tiền)
+    // BƯỚC 1: Tính Tiền, Đếm trễ & Đếm làm thêm
     for (var ex in exceptions) {
       if (ex.type == ScheduleExceptionType.late) {
         totalPenalty += ex.penalty;
         lateCount++;
+      }
+      if (ex.type == ScheduleExceptionType.unexcused) {
+        totalPenalty += ex.penalty;
+      }
+      if (ex.type == ScheduleExceptionType.extraShift) {
+        totalBonus += ex.bonus;
+        extraShiftDays++; // Đếm số ngoại lệ làm thêm
+      }
+    }
+
+    // BƯỚC 2: Duyệt lịch để tính Công & Ngày nghỉ
+    for (int i = 1; i <= totalDaysInMonth; i++) {
+      final date = DateTime(_selectedMonth.year, _selectedMonth.month, i);
+      final weekdayKey = _weekdayMap[date.weekday];
+
+      final shifts = widget.profile.defaultSchedule[weekdayKey] ?? [];
+      bool isScheduled = shifts.isNotEmpty;
+
+      bool hasAbsenceException = exceptions.any(
+        (e) =>
+            isSameDay(e.date, date) &&
+            (e.type == ScheduleExceptionType.absent ||
+                e.type == ScheduleExceptionType.unexcused),
+      );
+
+      if (isScheduled) {
+        standardWorkDays++;
+        actualWorkDays++;
+
+        if (hasAbsenceException) {
+          daysOff++;
+          actualWorkDays--; // Trừ ngày công thực tế nếu nghỉ
+        }
       }
     }
 
@@ -148,8 +126,10 @@ class _SingleEmployeeSalaryScreenState
       'standardDays': standardWorkDays,
       'actualDays': actualWorkDays,
       'offDays': daysOff,
+      'extraShiftDays': extraShiftDays, // Trả về số ngày làm thêm
       'penalty': totalPenalty,
       'lateCount': lateCount,
+      'bonus': totalBonus,
     };
   }
 
@@ -167,7 +147,6 @@ class _SingleEmployeeSalaryScreenState
       ),
       body: Column(
         children: [
-          // Thanh chọn tháng
           Container(
             color: Colors.indigo.shade50,
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -210,7 +189,8 @@ class _SingleEmployeeSalaryScreenState
 
                 final double baseSalary = widget.profile.salary;
                 final double penalty = stats['penalty'];
-                final double netSalary = baseSalary - penalty;
+                final double bonus = stats['bonus'];
+                final double netSalary = baseSalary + bonus - penalty;
 
                 return ListView(
                   padding: const EdgeInsets.all(16),
@@ -231,45 +211,61 @@ class _SingleEmployeeSalaryScreenState
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.2,
                               ),
                             ),
                             const SizedBox(height: 8),
                             Text(
                               formatCurrency(netSalary),
                               style: const TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
+                                fontSize: 36,
+                                fontWeight: FontWeight.w900,
                                 color: Colors.green,
                               ),
                             ),
-                            const Divider(height: 30),
+                            const Divider(height: 30, thickness: 1),
                             _buildRow(
                               "Lương cứng",
                               formatCurrency(baseSalary),
                               isBold: true,
                             ),
-                            const SizedBox(height: 8),
-                            _buildRow(
-                              "Tổng Trừ/Phạt",
-                              "-${formatCurrency(penalty)}",
-                              color: Colors.red,
-                            ),
+                            const SizedBox(height: 12),
+                            if (bonus > 0) ...[
+                              _buildRow(
+                                "Lương làm thêm",
+                                "+${formatCurrency(bonus)}",
+                                color: Colors.blue.shade700,
+                                icon: Icons.add_circle_outline,
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            if (penalty > 0) ...[
+                              _buildRow(
+                                "Tổng Trừ/Phạt",
+                                "-${formatCurrency(penalty)}",
+                                color: Colors.red.shade700,
+                                icon: Icons.remove_circle_outline,
+                              ),
+                            ],
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
-                    // 2. Thẻ Chấm công
+                    // 2. Thẻ Thống kê công
                     const Text(
                       "Thống kê công",
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
+                        color: Colors.indigo,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Card(
+                      elevation: 2,
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: Column(
@@ -278,36 +274,57 @@ class _SingleEmployeeSalaryScreenState
                               "Số ngày công chuẩn",
                               "${stats['standardDays']} ngày",
                             ),
-                            const Divider(),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8.0),
+                              child: Divider(),
+                            ),
+
                             _buildRow(
                               "Thực tế đi làm",
                               "${stats['actualDays']} ngày",
                               isBold: true,
-                              color: Colors.blue,
+                              color: Colors.blue.shade800,
                             ),
-                            const Divider(),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8.0),
+                              child: Divider(),
+                            ),
+
+                            // MỚI: HIỂN THỊ SỐ NGÀY LÀM THÊM
+                            _buildRow(
+                              "Số ngày làm thêm",
+                              "${stats['extraShiftDays']} ngày",
+                              color: Colors.purple,
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8.0),
+                              child: Divider(),
+                            ),
+
                             _buildRow(
                               "Số ngày nghỉ (vắng)",
                               "${stats['offDays']} ngày",
-                              color: Colors.orange,
+                              color: Colors.orange.shade800,
                             ),
                           ],
                         ),
                       ),
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
-                    // 3. Thẻ Vi phạm
+                    // 3. Thẻ Chi tiết ngoại lệ
                     const Text(
-                      "Chi tiết vi phạm",
+                      "Chi tiết ngoại lệ",
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
+                        color: Colors.indigo,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Card(
+                      elevation: 2,
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: Column(
@@ -316,36 +333,92 @@ class _SingleEmployeeSalaryScreenState
                               "Số lần đi trễ",
                               "${stats['lateCount']} lần",
                             ),
-                            if (exceptions.isNotEmpty) ...[
-                              const Divider(),
-                              const SizedBox(height: 8),
-                              const Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  "Lịch sử ghi nhận:",
-                                  style: TextStyle(color: Colors.grey),
+                            const Divider(height: 24),
+                            const Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                "Lịch sử ghi nhận:",
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
-                              ...exceptions.map(
-                                (e) => ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  dense: true,
-                                  title: Text(
-                                    "${DateFormat('dd/MM').format(e.date)} - ${e.type.display}",
+                            ),
+                            const SizedBox(height: 8),
+
+                            if (exceptions.isNotEmpty)
+                              ...exceptions.map((e) {
+                                String amountText = "";
+                                Color amountColor = Colors.black;
+
+                                if (e.penalty > 0) {
+                                  amountText = "-${formatCurrency(e.penalty)}";
+                                  amountColor = Colors.red;
+                                } else if (e.bonus > 0) {
+                                  amountText = "+${formatCurrency(e.bonus)}";
+                                  amountColor = Colors.green;
+                                }
+
+                                String titleText = e.type.display;
+                                if (e.type ==
+                                        ScheduleExceptionType.extraShift &&
+                                    e.shift != null &&
+                                    e.shift!.isNotEmpty) {
+                                  titleText += " (${e.shift})";
+                                }
+
+                                final dateStr = DateFormat(
+                                  'dd/MM',
+                                  'vi_VN',
+                                ).format(e.date);
+
+                                return Container(
+                                  width: double.infinity, // full chiều ngang
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: Colors.grey.shade200,
+                                    ),
                                   ),
-                                  trailing: Text(
-                                    e.penalty > 0
-                                        ? "-${formatCurrency(e.penalty)}"
-                                        : "0đ",
-                                    style: const TextStyle(color: Colors.red),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      // Hàng 1: ngày + nội dung
+                                      Text(
+                                        "$dateStr - $titleText",
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.grey.shade800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      // Hàng 2: số tiền, canh phải
+                                      if (amountText.isNotEmpty)
+                                        Align(
+                                          alignment: Alignment.centerRight,
+                                          child: Text(
+                                            amountText,
+                                            style: TextStyle(
+                                              color: amountColor,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   ),
-                                ),
-                              ),
-                            ] else
+                                );
+                              })
+                            else
                               const Padding(
-                                padding: EdgeInsets.only(top: 8.0),
+                                padding: EdgeInsets.only(top: 12.0),
                                 child: Text(
-                                  "Không có ghi nhận vi phạm nào.",
+                                  "Không có ghi nhận ngoại lệ nào trong tháng này.",
                                   style: TextStyle(
                                     fontStyle: FontStyle.italic,
                                     color: Colors.grey,
@@ -371,11 +444,23 @@ class _SingleEmployeeSalaryScreenState
     String value, {
     bool isBold = false,
     Color? color,
+    IconData? icon,
   }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 16)),
+        Row(
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 18, color: Colors.grey.shade600),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              label,
+              style: const TextStyle(fontSize: 16, color: Colors.black87),
+            ),
+          ],
+        ),
         Text(
           value,
           style: TextStyle(

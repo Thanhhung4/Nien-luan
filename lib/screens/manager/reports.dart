@@ -198,6 +198,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
           realSalary -= ex.penalty; // Trừ tiền phạt
         }
         // Nếu muốn cộng tiền làm thêm (extraShift), bạn có thể thêm logic ở đây
+        if (ex.type == ScheduleExceptionType.extraShift) {
+          realSalary += ex.bonus; // <-- Cộng lương làm thêm
+        }
       }
 
       // Đảm bảo lương không âm
