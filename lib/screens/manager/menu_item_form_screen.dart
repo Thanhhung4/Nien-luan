@@ -8,6 +8,7 @@ import 'package:myshop/models/menu_item.dart';
 import 'package:myshop/services/pocketbase_service.dart';
 import 'package:myshop/screens/manager/recipe_management_screen.dart';
 import 'package:myshop/utils/currency_formatter.dart'; // <--- SỬA LỖI 1
+import 'package:myshop/utils/constants.dart';
 
 class MenuItemFormScreen extends StatefulWidget {
   final MenuItemModel? menuItem;
@@ -27,8 +28,10 @@ class _MenuItemFormScreenState extends State<MenuItemFormScreen> {
   late TextEditingController _nameController;
   late TextEditingController
   _priceController; // Vẫn dùng để nhập giá trong Dialog
-  late TextEditingController _unitController;
   late TextEditingController _descriptionController;
+
+  // Selected values
+  String? _selectedUnit;
 
   // State
   MenuItemCategory _selectedCategory = MenuItemCategory.food;
@@ -50,8 +53,9 @@ class _MenuItemFormScreenState extends State<MenuItemFormScreen> {
     _priceController = TextEditingController(
       text: item?.price.toString() ?? '0',
     );
-    _unitController = TextEditingController(text: item?.unit);
     _descriptionController = TextEditingController(text: item?.description);
+
+    _selectedUnit = item?.unit;
 
     _currentPrice = item?.price ?? 0.0;
     _currentCost = item?.cost ?? 0.0;
@@ -65,7 +69,6 @@ class _MenuItemFormScreenState extends State<MenuItemFormScreen> {
   void dispose() {
     _nameController.dispose();
     _priceController.dispose();
-    _unitController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -91,7 +94,7 @@ class _MenuItemFormScreenState extends State<MenuItemFormScreen> {
     try {
       final name = _nameController.text;
       final price = _currentPrice; // Lấy từ state
-      final unit = _unitController.text;
+      final unit = _selectedUnit ?? '';
       final description = _descriptionController.text;
       final cost = _currentCost; // Lấy từ state
       final category = _selectedCategory == MenuItemCategory.food
@@ -278,12 +281,28 @@ class _MenuItemFormScreenState extends State<MenuItemFormScreen> {
             ),
 
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _unitController,
+            DropdownButtonFormField<String>(
+              value: _selectedUnit,
               decoration: const InputDecoration(
-                labelText: 'Đơn vị (vd: ly, dĩa, phần)',
+                labelText: 'Đơn vị',
                 border: OutlineInputBorder(),
               ),
+              items: MENU_ITEM_UNITS
+                  .map(
+                    (unit) => DropdownMenuItem(value: unit, child: Text(unit)),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedUnit = value;
+                });
+              },
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Vui lòng chọn đơn vị';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<MenuItemCategory>(

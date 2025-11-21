@@ -5,6 +5,7 @@ import 'package:myshop/models/ingredient.dart';
 import 'package:myshop/models/ingredient_batch.dart';
 import 'package:myshop/services/pocketbase_service.dart';
 import 'package:myshop/utils/currency_formatter.dart';
+import 'package:myshop/utils/constants.dart';
 
 class InventoryManagementScreen extends StatefulWidget {
   const InventoryManagementScreen({super.key});
@@ -876,13 +877,13 @@ class _IngredientFormDialogState extends State<_IngredientFormDialog> {
   final pbService = PocketBaseService.instance;
   bool _isLoading = false;
   late TextEditingController _nameController;
-  late TextEditingController _unitController;
   late TextEditingController _costController;
+  String? _selectedUnit;
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.ingredient?.name);
-    _unitController = TextEditingController(text: widget.ingredient?.unit);
+    _selectedUnit = widget.ingredient?.unit;
     _costController = TextEditingController(
       text: widget.ingredient?.costPerUnit.toString() ?? '0',
     );
@@ -891,7 +892,6 @@ class _IngredientFormDialogState extends State<_IngredientFormDialog> {
   @override
   void dispose() {
     _nameController.dispose();
-    _unitController.dispose();
     _costController.dispose();
     super.dispose();
   }
@@ -901,7 +901,7 @@ class _IngredientFormDialogState extends State<_IngredientFormDialog> {
     setState(() => _isLoading = true);
     try {
       final name = _nameController.text;
-      final unit = _unitController.text;
+      final unit = _selectedUnit ?? '';
       final cost = double.tryParse(_costController.text) ?? 0.0;
       if (widget.ingredient == null) {
         await pbService.inventory.createIngredient(
@@ -948,10 +948,30 @@ class _IngredientFormDialogState extends State<_IngredientFormDialog> {
                 decoration: const InputDecoration(labelText: 'Tên'),
                 validator: (v) => (v == null || v.isEmpty) ? 'Trống' : null,
               ),
-              TextFormField(
-                controller: _unitController,
-                decoration: const InputDecoration(labelText: 'Đơn vị'),
-                validator: (v) => (v == null || v.isEmpty) ? 'Trống' : null,
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _selectedUnit,
+                decoration: const InputDecoration(
+                  labelText: 'Đơn vị',
+                  border: OutlineInputBorder(),
+                ),
+                items: INGREDIENT_UNITS
+                    .map(
+                      (unit) =>
+                          DropdownMenuItem(value: unit, child: Text(unit)),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedUnit = value;
+                  });
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Vui lòng chọn đơn vị';
+                  }
+                  return null;
+                },
               ),
               TextFormField(
                 controller: _costController,
