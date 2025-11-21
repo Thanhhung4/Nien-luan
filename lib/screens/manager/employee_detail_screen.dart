@@ -7,7 +7,7 @@ import 'package:myshop/services/pocketbase_service.dart';
 import 'package:myshop/models/staff_role.dart';
 import 'package:myshop/utils/currency_formatter.dart';
 import 'package:myshop/screens/manager/single_employee_salary_screen.dart';
-import 'package:myshop/screens/manager/staff_schedule_detail_screen.dart'; // <-- IMPORT MÀN HÌNH LỊCH
+import 'package:myshop/screens/manager/staff_schedule_detail_screen.dart';
 
 class EmployeeDetailScreen extends StatefulWidget {
   final StaffProfile profile;
@@ -34,6 +34,19 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     _currentProfile = widget.profile;
   }
 
+  Future<void> _reloadProfileData() async {
+    try {
+      final updatedProfile = await PocketBaseService.instance.users
+          .getStaffProfile(_currentProfile.id);
+      setState(() {
+        _currentProfile = updatedProfile;
+      });
+      widget.onProfileUpdated();
+    } catch (e) {
+      print("Lỗi tải lại hồ sơ: $e");
+    }
+  }
+
   void _showEditEmployeeDialog() {
     showDialog(
       context: context,
@@ -41,39 +54,30 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
       builder: (context) {
         return EditEmployeeDialog(
           profile: _currentProfile,
+          // SỬA LỖI Ở ĐÂY: Callback này giờ không nhận salary nữa
           onUpdate:
               ({
                 required String profileId,
                 required String name,
                 required StaffRole role,
-                required double salary,
                 required String status,
                 String? userId,
                 String? newEmail,
                 String? newPassword,
               }) async {
                 try {
+                  // Gọi hàm từ màn hình cha (cũng không truyền salary)
                   await widget.onUpdateDetails(
                     profileId: profileId,
                     name: name,
                     role: role,
-                    salary: salary,
                     status: status,
                     userId: userId,
                     newEmail: newEmail,
                     newPassword: newPassword,
                   );
 
-                  final pbService = PocketBaseService.instance;
-                  final updatedProfile = await pbService.users.getStaffProfile(
-                    _currentProfile.id,
-                  );
-
-                  setState(() {
-                    _currentProfile = updatedProfile;
-                  });
-
-                  widget.onProfileUpdated();
+                  await _reloadProfileData();
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -99,11 +103,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
         foregroundColor: Colors.white,
       ),
       body: ListView(
-        children: [
-          _buildHeader(),
-          _buildInfoCard(),
-          _buildScheduleButton(), // <-- Đổi tên hàm cho đúng ngữ cảnh
-        ],
+        children: [_buildHeader(), _buildInfoCard(), _buildScheduleButton()],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showEditEmployeeDialog,
@@ -167,7 +167,6 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
               value: _currentProfile.email,
             ),
 
-            // Nút xem Lương
             InkWell(
               onTap: () {
                 Navigator.of(context).push(
@@ -187,17 +186,11 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                       size: 20,
                     ),
                     const SizedBox(width: 16),
-                    const Text(
-                      "Lương cơ bản",
-                      style: TextStyle(color: Colors.grey),
-                    ),
+                    const Text("Lương", style: TextStyle(color: Colors.grey)),
                     const Spacer(),
-                    const Text(
+                    Text(
                       "Xem chi tiết",
-                      style: TextStyle(
-                        color: Colors.blue,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: const TextStyle(fontWeight: FontWeight.w500),
                     ),
                     const SizedBox(width: 8),
                     const Icon(
@@ -215,23 +208,18 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     );
   }
 
-  // --- WIDGET MỚI: NÚT BẤM SANG QUẢN LÝ LỊCH ---
   Widget _buildScheduleButton() {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16.0),
       child: InkWell(
         onTap: () async {
-          // Chuyển sang màn hình Lịch chi tiết
           await Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) =>
                   StaffScheduleDetailScreen(profile: _currentProfile),
             ),
           );
-
-          // Khi quay lại, nếu muốn refresh dữ liệu (ví dụ lịch update),
-          // có thể gọi lại API ở đây nếu cần thiết.
-          // Tuy nhiên StaffScheduleDetailScreen quản lý data riêng nên thường không cần reload profile ngay.
+          await _reloadProfileData();
         },
         child: Padding(
           padding: const EdgeInsets.all(16.0),

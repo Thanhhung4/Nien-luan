@@ -1,19 +1,21 @@
+// [CẬP NHẬT FILE: lib/widgets/manager/add_employee_dialog.dart]
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:myshop/models/staff_role.dart';
 
-// Callback function mới (đã đơn giản hóa)
-typedef AddStaffProfileCallback =
+// Callback
+typedef OnAddEmployee =
     Future<void> Function({
       required String name,
+      required String email,
+      required String password,
       required StaffRole role,
-      double salary,
-      String? email,
-      String? password,
+      required double salary,
     });
 
 class AddEmployeeDialog extends StatefulWidget {
-  final AddStaffProfileCallback onAdd;
+  final OnAddEmployee onAdd;
+
   const AddEmployeeDialog({super.key, required this.onAdd});
 
   @override
@@ -22,39 +24,38 @@ class AddEmployeeDialog extends StatefulWidget {
 
 class _AddEmployeeDialogState extends State<AddEmployeeDialog> {
   final _formKey = GlobalKey<FormState>();
-  final nameController = TextEditingController();
-  final emailController = TextEditingController();
-  final passwordController = TextEditingController();
-  final confirmPasswordController = TextEditingController();
-  final salaryController = TextEditingController(text: '0');
-
-  StaffRole _selectedRole = StaffRole.employee;
   bool _isLoading = false;
+  bool _obscurePassword = true;
+
+  // Controllers
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  StaffRole _selectedRole = StaffRole.employee; // Mặc định là nhân viên
 
   @override
   void dispose() {
-    nameController.dispose();
-    emailController.dispose();
-    passwordController.dispose();
-    confirmPasswordController.dispose();
-    salaryController.dispose();
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (_formKey.currentState?.validate() ?? false) {
-      setState(() {
-        _isLoading = true;
-      });
+      setState(() => _isLoading = true);
       try {
+        // Kiểm tra xem vai trò này có cần login không
+        final bool needsAccount = _selectedRole == StaffRole.employee;
+
         await widget.onAdd(
-          name: nameController.text,
+          name: _nameController.text.trim(),
+          // Nếu cần TK thì lấy giá trị nhập, không thì gửi chuỗi rỗng
+          email: needsAccount ? _emailController.text.trim() : "",
+          password: needsAccount ? _passwordController.text.trim() : "",
           role: _selectedRole,
-          salary: double.tryParse(salaryController.text) ?? 0.0,
-          email: _selectedRole.needsLoginAccount ? emailController.text : null,
-          password: _selectedRole.needsLoginAccount
-              ? passwordController.text
-              : null,
+          salary: 0, // Lương tự động tính sau
         );
         if (mounted) Navigator.of(context).pop();
       } catch (e) {
@@ -62,12 +63,7 @@ class _AddEmployeeDialogState extends State<AddEmployeeDialog> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
           );
-        }
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
+          setState(() => _isLoading = false);
         }
       }
     }
@@ -75,101 +71,149 @@ class _AddEmployeeDialogState extends State<AddEmployeeDialog> {
 
   @override
   Widget build(BuildContext context) {
+    // Chỉ Nhân viên (employee) mới cần tài khoản đăng nhập
+    // (Dựa trên logic bạn yêu cầu: admin & employee có user, còn lại thì không)
+    final bool needsAccount = _selectedRole == StaffRole.employee;
+
     return AlertDialog(
-      title: const Text('Thêm Nhân viên Mới'),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
+      title: const Text('Thêm Nhân Viên Mới'),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 1. Tên (Luôn bắt buộc)
               TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Tên đầy đủ*'),
-                validator: (value) => (value == null || value.isEmpty)
-                    ? 'Tên không được để trống'
-                    : null,
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Họ và Tên',
+                  prefixIcon: Icon(Icons.person),
+                  border: OutlineInputBorder(),
+                ),
+                validator: (v) =>
+                    (v == null || v.isEmpty) ? 'Vui lòng nhập tên' : null,
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
+
+              // 2. Chọn Vai trò (Đưa lên trên để điều khiển hiển thị Email/Pass)
               DropdownButtonFormField<StaffRole>(
                 value: _selectedRole,
-                decoration: const InputDecoration(labelText: 'Vai trò*'),
+                decoration: const InputDecoration(
+                  labelText: 'Vai trò / Chức vụ',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.work),
+                ),
                 items: StaffRole.values.map((role) {
                   return DropdownMenuItem(
                     value: role,
                     child: Text(role.display),
                   );
                 }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
+                onChanged: (val) {
+                  if (val != null) {
                     setState(() {
-                      _selectedRole = value;
+                      _selectedRole = val;
                     });
                   }
                 },
               ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: salaryController,
-                decoration: const InputDecoration(labelText: 'Lương (VND)'),
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              ),
+              const SizedBox(height: 16),
 
-              if (_selectedRole.needsLoginAccount)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Divider(height: 24),
-                    Text(
-                      'Tài khoản đăng nhập (Bắt buộc cho ${(_selectedRole).display})',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    TextFormField(
-                      controller: emailController,
-                      decoration: const InputDecoration(labelText: 'Email*'),
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (value) {
-                        if (_selectedRole.needsLoginAccount &&
-                            (value == null || !value.contains('@'))) {
-                          return 'Vui lòng nhập email hợp lệ';
-                        }
-                        return null;
-                      },
-                    ),
-                    TextFormField(
-                      controller: passwordController,
-                      decoration: const InputDecoration(labelText: 'Mật khẩu*'),
-                      obscureText: true,
-                      validator: (value) {
-                        if (_selectedRole.needsLoginAccount &&
-                            (value == null || value.length < 8)) {
-                          return 'Mật khẩu phải có ít nhất 8 ký tự';
-                        }
-                        return null;
-                      },
-                    ),
-                    TextFormField(
-                      controller: confirmPasswordController,
-                      decoration: const InputDecoration(
-                        labelText: 'Xác nhận mật khẩu*',
+              // 3. Email & Mật khẩu (Chỉ hiện nếu là Employee)
+              if (needsAccount) ...[
+                TextFormField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email đăng nhập',
+                    prefixIcon: Icon(Icons.email),
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) {
+                    if (!needsAccount) return null;
+                    return (v == null || v.isEmpty || !v.contains('@'))
+                        ? 'Email không hợp lệ'
+                        : null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'Mật khẩu',
+                    prefixIcon: const Icon(Icons.lock),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
                       ),
-                      obscureText: true,
-                      validator: (value) {
-                        if (_selectedRole.needsLoginAccount) {
-                          if (value == null || value.isEmpty) {
-                            return 'Vui lòng xác nhận mật khẩu';
-                          }
-                          if (value != passwordController.text) {
-                            return 'Mật khẩu không khớp';
-                          }
-                        }
-                        return null;
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
                       },
+                    ),
+                  ),
+                  validator: (v) {
+                    if (!needsAccount) return null;
+                    return (v == null || v.length < 6)
+                        ? 'Mật khẩu tối thiểu 6 ký tự'
+                        : null;
+                  },
+                ),
+                const SizedBox(height: 16),
+              ] else ...[
+                // Thông báo cho các vai trò không cần đăng nhập
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info, size: 20, color: Colors.orange.shade800),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          "Vai trò '${_selectedRole.display}' chỉ cần lưu hồ sơ chấm công, không cần tạo tài khoản đăng nhập.",
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.orange.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Lương (Thông báo tự động)
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.attach_money, size: 16, color: Colors.blue),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "Lương sẽ được tính tự động dựa trên Lịch làm việc.",
+                        style: TextStyle(fontSize: 12, color: Colors.blue),
+                      ),
                     ),
                   ],
                 ),
+              ),
             ],
           ),
         ),
@@ -185,7 +229,10 @@ class _AddEmployeeDialogState extends State<AddEmployeeDialog> {
               ? const SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 )
               : const Text('Thêm'),
         ),
