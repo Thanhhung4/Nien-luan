@@ -5,7 +5,6 @@ import 'package:myshop/screens/auth/login_screen.dart';
 import 'package:myshop/services/pocketbase_service.dart';
 import 'package:myshop/screens/manager/manage_menu.dart';
 import 'package:myshop/screens/manager/employee_management_screen.dart';
-import 'package:myshop/screens/manager/schedule_management_screen.dart';
 import 'package:myshop/screens/manager/notification_management_screen.dart';
 import 'package:myshop/screens/manager/reports.dart';
 import 'package:myshop/screens/order/completed_orders_screen.dart';
@@ -65,19 +64,6 @@ class ManagerHome extends StatelessWidget {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (context) => const EmployeeManagementScreen(),
-                ),
-              );
-            },
-          ),
-          _buildDashboardButton(
-            context,
-            icon: Icons.calendar_month,
-            label: 'Quản lý Lịch làm',
-            color: Colors.teal,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const ScheduleManagementScreen(),
                 ),
               );
             },

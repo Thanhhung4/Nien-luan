@@ -30,11 +30,13 @@ class ScheduleService {
   }
 
   /// (Cho Quản lý) Tạo một "Ngoại lệ" mới (Nghỉ hoặc Làm thêm)
+  // 1. Cập nhật hàm createScheduleException
   Future<void> createScheduleException({
     required String staffProfileId,
     required DateTime date,
     required ScheduleExceptionType type,
-    String? shift, // Chỉ cần thiết nếu type là 'extraShift'
+    String? shift,
+    double penalty = 0.0, // Thêm tham số này
   }) async {
     try {
       final body = <String, dynamic>{
@@ -42,12 +44,28 @@ class ScheduleService {
         'date': DateFormat('yyyy-MM-dd').format(date.toUtc()),
         'type': type.toJson(),
         'shift': (type == ScheduleExceptionType.extraShift) ? shift : null,
+        'penalty': penalty, // Gửi lên DB
       };
       await pb.collection('schedule_exceptions').create(body: body);
     } catch (e) {
       print('ScheduleService - Error creating exception: $e');
       throw Exception('Failed to create schedule exception: $e');
     }
+  }
+
+  // 2. (MỚI) Hàm lấy tất cả ngoại lệ trong tháng (để tính lương)
+  Future<List<ScheduleExceptionModel>> getAllExceptionsInMonth(
+    DateTime month,
+  ) async {
+    final start = DateTime(month.year, month.month, 1);
+    final end = DateTime(month.year, month.month + 1, 0);
+    final startStr = DateFormat('yyyy-MM-dd').format(start);
+    final endStr = DateFormat('yyyy-MM-dd').format(end);
+
+    final records = await pb
+        .collection('schedule_exceptions')
+        .getFullList(filter: 'date >= "$startStr" && date <= "$endStr"');
+    return records.map((r) => ScheduleExceptionModel.fromRecord(r)).toList();
   }
 
   /// (Cho Quản lý) Xóa một "Ngoại lệ"
