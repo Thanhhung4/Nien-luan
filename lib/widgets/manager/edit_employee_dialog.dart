@@ -1,17 +1,18 @@
+// [CẬP NHẬT FILE: lib/widgets/manager/edit_employee_dialog.dart]
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:myshop/models/staff_profile.dart';
 import 'package:myshop/models/staff_role.dart';
+import 'package:myshop/utils/currency_formatter.dart';
 
-// Callback mới (thêm email/password)
+// Callback cập nhật
 typedef UpdateStaffDetailsCallback =
     Future<void> Function({
       required String profileId,
       required String name,
       required StaffRole role,
-      required double salary,
       required String status,
-      // Thêm thông tin tài khoản (nếu có)
       String? userId,
       String? newEmail,
       String? newPassword,
@@ -33,32 +34,26 @@ class EditEmployeeDialog extends StatefulWidget {
 
 class _EditEmployeeDialogState extends State<EditEmployeeDialog> {
   final _formKey = GlobalKey<FormState>();
-  // Controllers cho Profile
-  late TextEditingController nameController;
-  late TextEditingController salaryController;
-  late StaffRole _selectedRole;
-  late String _selectedStatus;
 
-  // Controllers cho Account (nếu có)
+  late TextEditingController nameController;
   late TextEditingController emailController;
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
 
+  late StaffRole _selectedRole;
+  late String _selectedStatus;
   bool _isLoading = false;
+
   final List<String> _statusOptions = ['active', 'resigned', 'on_leave'];
 
   @override
   void initState() {
     super.initState();
     nameController = TextEditingController(text: widget.profile.name);
-    salaryController = TextEditingController(
-      text: widget.profile.salary.toStringAsFixed(0),
-    );
-    _selectedRole = widget.profile.role;
-    _selectedStatus = widget.profile.status;
-
     emailController = TextEditingController(text: widget.profile.email);
 
+    _selectedRole = widget.profile.role;
+    _selectedStatus = widget.profile.status;
     if (!_statusOptions.contains(_selectedStatus)) {
       _selectedStatus = 'active';
     }
@@ -67,7 +62,6 @@ class _EditEmployeeDialogState extends State<EditEmployeeDialog> {
   @override
   void dispose() {
     nameController.dispose();
-    salaryController.dispose();
     emailController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
@@ -76,9 +70,7 @@ class _EditEmployeeDialogState extends State<EditEmployeeDialog> {
 
   Future<void> _submit() async {
     if (_formKey.currentState?.validate() ?? false) {
-      setState(() {
-        _isLoading = true;
-      });
+      setState(() => _isLoading = true);
 
       String? newEmail;
       if (widget.profile.hasLoginAccount &&
@@ -96,8 +88,7 @@ class _EditEmployeeDialogState extends State<EditEmployeeDialog> {
         await widget.onUpdate(
           profileId: widget.profile.id,
           name: nameController.text,
-          role: _selectedRole, // Không cho đổi nữa
-          salary: double.tryParse(salaryController.text) ?? 0.0,
+          role: _selectedRole, // Role giữ nguyên
           status: _selectedStatus,
           userId: widget.profile.userId,
           newEmail: newEmail,
@@ -109,12 +100,7 @@ class _EditEmployeeDialogState extends State<EditEmployeeDialog> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
           );
-        }
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
+          setState(() => _isLoading = false);
         }
       }
     }
@@ -124,10 +110,6 @@ class _EditEmployeeDialogState extends State<EditEmployeeDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text('Sửa Hồ sơ: ${widget.profile.name}'),
-      insetPadding: const EdgeInsets.symmetric(
-        horizontal: 16.0,
-        vertical: 24.0,
-      ),
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
@@ -135,115 +117,107 @@ class _EditEmployeeDialogState extends State<EditEmployeeDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Thông tin cơ bản',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 10),
+              // -------- TÊN --------
               TextFormField(
                 controller: nameController,
                 decoration: const InputDecoration(labelText: 'Tên đầy đủ*'),
-                validator: (value) => (value == null || value.isEmpty)
-                    ? 'Tên không được để trống'
-                    : null,
+                validator: (v) =>
+                    (v == null || v.isEmpty) ? 'Không được để trống' : null,
               ),
               const SizedBox(height: 10),
 
-              // Vai trò (chỉ đọc)
+              // -------- ROLE (ĐÃ KHÓA) --------
               TextFormField(
-                readOnly: true,
                 initialValue: _selectedRole.display,
-                decoration: const InputDecoration(
-                  labelText: 'Vai trò',
-                  suffixIcon: Icon(Icons.lock, size: 18),
+                readOnly: true,
+                decoration: InputDecoration(
+                  labelText: 'Vai trò (Không thể thay đổi)',
+                  prefixIcon: const Icon(Icons.work_outline),
+                  border: const OutlineInputBorder(),
+                  fillColor: Colors.grey.shade200,
+                  filled: true,
                 ),
+                style: TextStyle(color: Colors.grey.shade700),
               ),
               const SizedBox(height: 10),
 
-              TextFormField(
-                controller: salaryController,
-                decoration: const InputDecoration(labelText: 'Lương (VND)'),
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              ),
-              const SizedBox(height: 10),
+              // -------- TRẠNG THÁI --------
               DropdownButtonFormField<String>(
                 value: _selectedStatus,
-                decoration: const InputDecoration(labelText: 'Trạng thái*'),
+                decoration: const InputDecoration(labelText: 'Trạng thái'),
                 items: _statusOptions
-                    .map(
-                      (status) =>
-                          DropdownMenuItem(value: status, child: Text(status)),
-                    )
+                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                     .toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _selectedStatus = value;
-                    });
-                  }
+                onChanged: (val) {
+                  if (val != null) setState(() => _selectedStatus = val);
                 },
               ),
+              const SizedBox(height: 10),
 
-              // --- Thông tin Tài khoản ---
-              if (widget.profile.hasLoginAccount)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Divider(height: 24),
-                    Text(
-                      'Thông tin tài khoản (Đăng nhập)',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 10),
-                    TextFormField(
-                      controller: emailController,
-                      decoration: const InputDecoration(labelText: 'Email*'),
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (value) =>
-                          (value == null || !value.contains('@'))
-                          ? 'Email không hợp lệ'
-                          : null,
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Đặt lại mật khẩu (để trống nếu không đổi)',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    TextFormField(
-                      controller: passwordController,
-                      decoration: const InputDecoration(
-                        labelText: 'Mật khẩu mới',
-                      ),
-                      obscureText: true,
-                      validator: (value) {
-                        if (value != null &&
-                            value.isNotEmpty &&
-                            value.length < 8) {
-                          return 'Mật khẩu mới phải ít nhất 8 ký tự';
-                        }
-                        if (value != confirmPasswordController.text) {
-                          return 'Mật khẩu xác nhận không khớp';
-                        }
-                        return null;
-                      },
-                    ),
-                    TextFormField(
-                      controller: confirmPasswordController,
-                      decoration: const InputDecoration(
-                        labelText: 'Xác nhận mật khẩu mới',
-                      ),
-                      obscureText: true,
-                      validator: (value) {
-                        if (passwordController.text.isNotEmpty &&
-                            value != passwordController.text) {
-                          return 'Mật khẩu xác nhận không khớp';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
+              // -------- LƯƠNG CHỈ ĐỌC --------
+              InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Lương cứng (Tự động tính)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.attach_money),
                 ),
+                child: Text(
+                  formatCurrency(widget.profile.salary),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+
+              // -------- TÀI KHOẢN (Nếu có) --------
+              if (widget.profile.hasLoginAccount) ...[
+                const Divider(height: 30),
+                Text(
+                  'Tài khoản đăng nhập',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 10),
+
+                TextFormField(
+                  controller: emailController,
+                  decoration: const InputDecoration(labelText: 'Email*'),
+                  validator: (v) => (v == null || !v.contains('@'))
+                      ? 'Email sai định dạng'
+                      : null,
+                ),
+                const SizedBox(height: 10),
+
+                TextFormField(
+                  controller: passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Mật khẩu mới (nếu đổi)',
+                  ),
+                  validator: (v) {
+                    if (v != null && v.isNotEmpty && v.length < 8) {
+                      return 'Tối thiểu 8 ký tự';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 10),
+
+                TextFormField(
+                  controller: confirmPasswordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Xác nhận mật khẩu',
+                  ),
+                  validator: (v) {
+                    if (passwordController.text.isNotEmpty &&
+                        v != passwordController.text) {
+                      return 'Mật khẩu không khớp';
+                    }
+                    return null;
+                  },
+                ),
+              ],
             ],
           ),
         ),
@@ -255,13 +229,7 @@ class _EditEmployeeDialogState extends State<EditEmployeeDialog> {
         ),
         ElevatedButton(
           onPressed: _isLoading ? null : _submit,
-          child: _isLoading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Lưu'),
+          child: const Text('Lưu'),
         ),
       ],
     );

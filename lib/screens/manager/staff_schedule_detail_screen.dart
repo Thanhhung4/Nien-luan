@@ -1,4 +1,4 @@
-// [DÁN TOÀN BỘ CODE NÀY VÀO lib/screens/manager/staff_schedule_detail_screen.dart]
+// [CẬP NHẬT FILE: lib/screens/manager/staff_schedule_detail_screen.dart]
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -6,7 +6,7 @@ import 'package:myshop/models/schedule_exception.dart';
 import 'package:myshop/models/staff_profile.dart';
 import 'package:myshop/services/pocketbase_service.dart';
 import 'package:myshop/widgets/manager/add_exception_dialog.dart';
-import 'package:myshop/utils/currency_formatter.dart'; // <-- Import mới
+import 'package:myshop/utils/currency_formatter.dart';
 
 // Định nghĩa các hằng số cho form
 const List<String> _allWorkDays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -26,14 +26,14 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
     with SingleTickerProviderStateMixin {
   final pbService = PocketBaseService.instance;
 
-  // State cho Tab Ngoại lệ
   late Future<List<ScheduleExceptionModel>> _exceptionsFuture;
-  final DateTime _startDate = DateTime.now().subtract(
-    const Duration(days: 30),
-  ); // Load rộng ra xíu
+
+  // Biến lưu danh sách exception để truyền vào Dialog check trùng
+  List<ScheduleExceptionModel> _currentExceptions = [];
+
+  final DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
   final DateTime _endDate = DateTime.now().add(const Duration(days: 60));
 
-  // State cho Tab Lịch Cố Định
   final _formKey = GlobalKey<FormState>();
   late Map<String, Set<String>> _scheduleMap;
   bool _isSavingSchedule = false;
@@ -53,22 +53,26 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
   Future<void> _loadExceptions() async {
     if (mounted) {
       setState(() {
-        _exceptionsFuture = pbService.schedules.getScheduleExceptions(
-          staffProfileId: widget.profile.id,
-          startDate: _startDate,
-          endDate: _endDate,
-        );
+        _exceptionsFuture = pbService.schedules
+            .getScheduleExceptions(
+              staffProfileId: widget.profile.id,
+              startDate: _startDate,
+              endDate: _endDate,
+            )
+            .then((value) {
+              _currentExceptions = value; // Lưu lại list để dùng
+              return value;
+            });
       });
     }
   }
 
-  // Cập nhật hàm này để nhận thêm penalty
   Future<void> _handleCreateException({
     required DateTime date,
     required ScheduleExceptionType type,
     String? shift,
-    double penalty = 0.0, // <-- Thêm tham số này
-    double bonus = 0.0, // <-- Thêm tham số bonus
+    double penalty = 0.0,
+    double bonus = 0.0,
   }) async {
     try {
       await pbService.schedules.createScheduleException(
@@ -76,7 +80,7 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
         date: date,
         type: type,
         shift: shift,
-        penalty: penalty, // <-- Truyền lên service
+        penalty: penalty,
         bonus: bonus,
       );
       if (mounted) _showSnackbar('Đã thêm ngoại lệ', Colors.green);
@@ -104,11 +108,17 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
           onSave: _handleCreateException,
           initialDate: DateTime.now(),
           defaultSchedule: widget.profile.defaultSchedule,
+          existingExceptions:
+              _currentExceptions, // <-- TRUYỀN DANH SÁCH HIỆN CÓ VÀO
         );
       },
     );
   }
 
+  // ... (Phần còn lại của file: _saveDefaultSchedule, _showSnackbar, build, v.v... GIỮ NGUYÊN)
+  // Bạn giữ nguyên phần code hiển thị UI và Table lịch bên dưới nhé, chỉ thay đổi phần showAddDialog ở trên.
+
+  // --- (Code copy lại để đảm bảo file hoàn chỉnh) ---
   Future<void> _saveDefaultSchedule() async {
     if (_formKey.currentState?.validate() ?? false) {
       setState(() {
@@ -283,13 +293,12 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
           ),
         ),
         ..._allShifts.map((shift) {
-          String shortShift = shift.replaceAll('Ca ', '');
           return TableCell(
             verticalAlignment: TableCellVerticalAlignment.middle,
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 22.0),
-                child: Text(shortShift, style: headerStyle),
+                child: Text(shift.replaceAll('Ca ', ''), style: headerStyle),
               ),
             ),
           );
@@ -300,7 +309,6 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
 
   TableRow _buildDayScheduleRow(String day) {
     bool? selectAllState = _getSelectAllStateForDay(day);
-
     return TableRow(
       children: [
         TableCell(
@@ -318,9 +326,7 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
               Checkbox(
                 value: selectAllState,
                 tristate: true,
-                onChanged: (bool? val) {
-                  _toggleAllShiftsForDay(day, val);
-                },
+                onChanged: (val) => _toggleAllShiftsForDay(day, val),
                 activeColor: Colors.teal,
               ),
             ],
@@ -333,9 +339,7 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
             child: Center(
               child: Checkbox(
                 value: isSelected,
-                onChanged: (bool? val) {
-                  _toggleShift(day, shift, val);
-                },
+                onChanged: (val) => _toggleShift(day, shift, val),
                 activeColor: Colors.teal,
               ),
             ),
@@ -345,7 +349,6 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
     );
   }
 
-  // --- ĐÃ CẬP NHẬT ĐỂ HIỂN THỊ ĐÚNG LOẠI + TIỀN PHẠT + THƯỞNG ---
   Widget _buildExceptionsTab() {
     return Scaffold(
       body: RefreshIndicator(
@@ -353,14 +356,12 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
         child: FutureBuilder<List<ScheduleExceptionModel>>(
           future: _exceptionsFuture,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
+            if (snapshot.connectionState == ConnectionState.waiting)
               return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
+            if (snapshot.hasError)
               return Center(child: Text('Lỗi: ${snapshot.error}'));
-            }
             final exceptions = snapshot.data ?? [];
-            if (exceptions.isEmpty) {
+            if (exceptions.isEmpty)
               return Stack(
                 children: [
                   ListView(),
@@ -372,18 +373,15 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
                   ),
                 ],
               );
-            }
+
             return ListView.separated(
               itemCount: exceptions.length,
               separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final ex = exceptions[index];
-
-                // Xác định Icon, Màu sắc và Tiêu đề
                 IconData icon;
                 Color color;
                 String titleText = ex.type.display;
-
                 switch (ex.type) {
                   case ScheduleExceptionType.extraShift:
                     icon = Icons.more_time;
@@ -396,14 +394,13 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
                     break;
                   case ScheduleExceptionType.late:
                     icon = Icons.timer_off;
-                    color = Colors.amber.shade800; // Màu cam đậm cảnh báo
+                    color = Colors.amber.shade800;
                     break;
                   case ScheduleExceptionType.unexcused:
-                    icon = Icons.block; // Icon cấm
+                    icon = Icons.block;
                     color = Colors.red;
                     break;
                 }
-
                 return ListTile(
                   leading: CircleAvatar(
                     backgroundColor: color.withOpacity(0.1),

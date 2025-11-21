@@ -1,6 +1,7 @@
+// [CẬP NHẬT FILE: lib/screens/manager/employee_management_screen.dart]
+
 import 'package:flutter/material.dart';
 import 'package:myshop/services/pocketbase_service.dart';
-// Import models và widgets mới
 import 'package:myshop/models/staff_profile.dart';
 import 'package:myshop/models/staff_role.dart';
 import 'package:myshop/widgets/manager/employee_list_view.dart';
@@ -18,7 +19,7 @@ class EmployeeManagementScreen extends StatefulWidget {
 
 class _EmployeeManagementScreenState extends State<EmployeeManagementScreen> {
   final PocketBaseService pbService = PocketBaseService.instance;
-  late Future<List<StaffProfile>> _staffProfilesFuture; // <-- ĐÃ SỬA
+  late Future<List<StaffProfile>> _staffProfilesFuture;
 
   @override
   void initState() {
@@ -27,15 +28,13 @@ class _EmployeeManagementScreenState extends State<EmployeeManagementScreen> {
   }
 
   Future<void> _loadStaffProfiles() async {
-    // <-- ĐÃ SỬA
     if (mounted) {
       setState(() {
-        _staffProfilesFuture = pbService.users.getStaffProfiles(); // <-- ĐÃ SỬA
+        _staffProfilesFuture = pbService.users.getStaffProfiles();
       });
     }
   }
 
-  // Hàm hiển thị Snackbar
   void _showSnackbar(String message, Color color) {
     if (mounted) {
       ScaffoldMessenger.of(
@@ -44,19 +43,16 @@ class _EmployeeManagementScreenState extends State<EmployeeManagementScreen> {
     }
   }
 
-  // --- LOGIC XỬ LÝ MỚI ---
-
   void _showAddEmployeeDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        return AddEmployeeDialog(onAdd: _handleAddStaffProfile); // <-- ĐÃ SỬA
+        return AddEmployeeDialog(onAdd: _handleAddStaffProfile);
       },
     );
   }
 
-  // Xử lý thêm hồ sơ (Đã đơn giản hóa)
   Future<void> _handleAddStaffProfile({
     required String name,
     required StaffRole role,
@@ -76,13 +72,11 @@ class _EmployeeManagementScreenState extends State<EmployeeManagementScreen> {
       _loadStaffProfiles();
     } catch (e) {
       _showSnackbar('Lỗi thêm nhân viên: $e', Colors.red);
-      throw e; // Ném lỗi để dialog biết
+      throw e;
     }
   }
 
-  // Xử lý xóa hồ sơ
   Future<bool> _handleDeleteStaffProfile(StaffProfile profile) async {
-    // <-- ĐÃ SỬA
     final confirmed =
         await showDialog<bool>(
           context: context,
@@ -107,7 +101,7 @@ class _EmployeeManagementScreenState extends State<EmployeeManagementScreen> {
 
     if (confirmed) {
       try {
-        await pbService.users.deleteStaffProfile(profile); // <-- ĐÃ SỬA
+        await pbService.users.deleteStaffProfile(profile);
         _showSnackbar(
           'Xóa nhân viên ${profile.name} thành công!',
           Colors.green,
@@ -127,9 +121,7 @@ class _EmployeeManagementScreenState extends State<EmployeeManagementScreen> {
       MaterialPageRoute(
         builder: (context) => EmployeeDetailScreen(
           profile: profile,
-          // Truyền hàm onUpdate vào
           onUpdateDetails: _handleUpdateStaffDetails,
-          // Truyền hàm yêu cầu tải lại list
           onProfileUpdated: () {
             _loadStaffProfiles();
           },
@@ -138,14 +130,12 @@ class _EmployeeManagementScreenState extends State<EmployeeManagementScreen> {
     );
   }
 
-  // Xử lý cập nhật hồ sơ (ĐÃ NÂNG CẤP)
+  // --- HÀM NÀY ĐÃ ĐƯỢC SỬA: KHÔNG CÒN THAM SỐ SALARY ---
   Future<void> _handleUpdateStaffDetails({
     required String profileId,
     required String name,
     required StaffRole role,
-    required double salary,
     required String status,
-    // Thêm các tham số mới
     String? userId,
     String? newEmail,
     String? newPassword,
@@ -155,18 +145,17 @@ class _EmployeeManagementScreenState extends State<EmployeeManagementScreen> {
         profileId: profileId,
         name: name,
         role: role,
-        salary: salary,
+        // salary: salary, <-- ĐÃ BỎ
         status: status,
-        // Gửi dữ liệu tài khoản
         userId: userId,
         newEmail: newEmail,
         newPassword: newPassword,
       );
       _showSnackbar('Cập nhật thông tin thành công!', Colors.green);
-      _loadStaffProfiles(); // Làm mới danh sách
+      _loadStaffProfiles();
     } catch (e) {
       _showSnackbar('Lỗi cập nhật: $e', Colors.red);
-      throw e; // Ném lại lỗi
+      throw e;
     }
   }
 
@@ -180,16 +169,15 @@ class _EmployeeManagementScreenState extends State<EmployeeManagementScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadStaffProfiles, // <-- ĐÃ SỬA
+            onPressed: _loadStaffProfiles,
             tooltip: 'Làm mới danh sách',
           ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _loadStaffProfiles, // <-- ĐÃ SỬA
+        onRefresh: _loadStaffProfiles,
         child: FutureBuilder<List<StaffProfile>>(
-          // <-- ĐÃ SỬA
-          future: _staffProfilesFuture, // <-- ĐÃ SỬA
+          future: _staffProfilesFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
@@ -226,10 +214,10 @@ class _EmployeeManagementScreenState extends State<EmployeeManagementScreen> {
               );
             }
 
-            final profiles = snapshot.data ?? []; // <-- ĐÃ SỬA
+            final profiles = snapshot.data ?? [];
             return EmployeeListView(
-              profiles: profiles, // <-- ĐÃ SỬA
-              onDeleteConfirmed: _handleDeleteStaffProfile, // <-- ĐÃ SỬA
+              profiles: profiles,
+              onDeleteConfirmed: _handleDeleteStaffProfile,
               onView: _navigateToDetail,
             );
           },

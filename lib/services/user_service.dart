@@ -133,7 +133,6 @@ class UserService {
     required String profileId,
     required String name,
     required StaffRole role,
-    required double salary,
     required String status,
     String? userId,
     String? newEmail,
@@ -143,7 +142,6 @@ class UserService {
       final profileBody = <String, dynamic>{
         'name': name,
         'role': role.toJson(),
-        'salary': salary,
         'status': status,
       };
       await pb
