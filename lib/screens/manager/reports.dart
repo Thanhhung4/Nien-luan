@@ -1,10 +1,12 @@
-// lib/screens/manager/reports.dart
+// [CẬP NHẬT FILE: lib/screens/manager/reports.dart]
+
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:myshop/models/order.dart';
 import 'package:myshop/models/staff_profile.dart';
 import 'package:myshop/models/best_seller_item.dart';
+import 'package:myshop/models/schedule_exception.dart'; // <-- Import mới
 import 'package:myshop/services/pocketbase_service.dart';
 import 'package:myshop/utils/currency_formatter.dart';
 import 'package:pocketbase/pocketbase.dart';
@@ -18,13 +20,14 @@ class DailyRevenue {
   DailyRevenue({required this.date, required this.total, required this.cost});
 }
 
-// ReportData: Orders, StaffProfiles, BestSellers, RawItems, SpoilageCost
+// ReportData: Orders, StaffProfiles, BestSellers, RawItems, SpoilageCost, Exceptions
 typedef ReportData = (
-  List<OrderModel>,
-  List<StaffProfile>,
-  List<BestSellerItem>,
-  List<RecordModel>,
-  double,
+  List<OrderModel>, // 0
+  List<StaffProfile>, // 1
+  List<BestSellerItem>, // 2
+  List<RecordModel>, // 3
+  double, // 4: spoilageCost
+  List<ScheduleExceptionModel>, // 5: exceptions (MỚI)
 );
 
 class ReportsScreen extends StatefulWidget {
@@ -56,6 +59,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
               pbService.reports.getBestSellingItems(_selectedMonth),
               pbService.reports.getRawSoldItems(_selectedMonth),
               pbService.reports.getMonthlySpoilageCost(_selectedMonth),
+              pbService.schedules.getAllExceptionsInMonth(
+                _selectedMonth,
+              ), // <-- MỚI
             ]).then((results) {
               return (
                 results[0] as List<OrderModel>,
@@ -63,6 +69,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 results[2] as List<BestSellerItem>,
                 results[3] as List<RecordModel>,
                 results[4] as double,
+                results[5] as List<ScheduleExceptionModel>, // <-- MỚI
               );
             });
       });
@@ -105,16 +112,26 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   return Center(child: Text('Lỗi: ${snapshot.error}'));
                 }
 
+                // Lấy dữ liệu từ snapshot
                 final orders = snapshot.data?.$1 ?? [];
                 final profiles = snapshot.data?.$2 ?? [];
                 final bestSellers = snapshot.data?.$3 ?? [];
                 final rawItems = snapshot.data?.$4 ?? [];
                 final spoilageCost = snapshot.data?.$5 ?? 0.0;
+                final exceptions =
+                    snapshot.data?.$6 ?? []; // <-- Lấy exceptions
 
+                // 1. Xử lý doanh thu & giá vốn
                 final (dailyData, totalRevenue, totalCOGS, busiestDay) =
                     _processReportData(orders, rawItems);
 
-                final totalPayroll = _processPayrollData(profiles);
+                // 2. Tính lương thực nhận (MỚI)
+                final (totalPayroll, salaryMap) = _calculateRealPayroll(
+                  profiles,
+                  exceptions,
+                );
+
+                // 3. Tính lợi nhuận
                 final double grossProfit = totalRevenue - totalCOGS;
                 final double netProfit =
                     grossProfit - totalPayroll - spoilageCost;
@@ -131,7 +148,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       busiestDay: busiestDay,
                     ),
                     const SizedBox(height: 16),
-                    _buildPayrollCard(totalPayroll, profiles, context),
+                    // Truyền thêm salaryMap vào card
+                    _buildPayrollCard(
+                      totalPayroll,
+                      profiles,
+                      context,
+                      salaryMap,
+                    ),
                     const SizedBox(height: 24),
                     _buildBestSellersCard(bestSellers),
                     const SizedBox(height: 24),
@@ -152,7 +175,41 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  // --- XỬ LÝ DỮ LIỆU ---
+  // --- HÀM TÍNH LƯƠNG THỰC TẾ (MỚI) ---
+  (double, Map<String, double>) _calculateRealPayroll(
+    List<StaffProfile> profiles,
+    List<ScheduleExceptionModel> exceptions,
+  ) {
+    double total = 0;
+    Map<String, double> map = {};
+
+    for (var p in profiles) {
+      // Chỉ tính cho nhân viên đang hoạt động
+      if (p.status != 'active') continue;
+
+      double realSalary = p.salary;
+
+      // Tìm các lỗi vi phạm của nhân viên này
+      final userExceptions = exceptions.where((e) => e.staffProfileId == p.id);
+
+      for (var ex in userExceptions) {
+        if (ex.type == ScheduleExceptionType.late ||
+            ex.type == ScheduleExceptionType.unexcused) {
+          realSalary -= ex.penalty; // Trừ tiền phạt
+        }
+        // Nếu muốn cộng tiền làm thêm (extraShift), bạn có thể thêm logic ở đây
+      }
+
+      // Đảm bảo lương không âm
+      if (realSalary < 0) realSalary = 0;
+
+      total += realSalary;
+      map[p.id] = realSalary;
+    }
+    return (total, map);
+  }
+
+  // --- XỬ LÝ REPORT DATA ---
   (List<DailyRevenue>, double, double, String) _processReportData(
     List<OrderModel> orders,
     List<RecordModel> rawItems,
@@ -220,6 +277,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return (dailyData, totalRevenue, totalCost, busiestDay);
   }
 
+  // --- CÁC WIDGET HIỂN THỊ ---
+
   Widget _buildSummaryCard({
     required double revenue,
     required double grossProfit,
@@ -237,7 +296,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Doanh thu & Lãi gộp - 1 dòng
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -255,8 +313,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ],
             ),
             const SizedBox(height: 16),
-
-            // Hao hụt (Nếu có)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -282,8 +338,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ],
             ),
             const SizedBox(height: 16),
-
-            // Lợi nhuận ròng
             Container(
               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
               decoration: BoxDecoration(
@@ -318,8 +372,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Tổng đơn & Đông nhất - 1 dòng
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -368,31 +420,24 @@ class _ReportsScreenState extends State<ReportsScreen> {
     double totalPayroll,
     List<StaffProfile> profiles,
     BuildContext context,
+    Map<String, double> salaryMap,
   ) {
     final activeStaff = profiles.where((p) => p.status == 'active').length;
-    return InkWell(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => SalaryDetailScreen(
-            profiles: profiles,
-            totalPayroll: totalPayroll,
-          ),
-        ),
-      ),
-      child: Card(
-        elevation: 4,
-        color: Colors.indigo.shade700,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildSummaryItem('Tổng Lương', formatCurrency(totalPayroll)),
-              _buildSummaryItem('Nhân viên', '$activeStaff'),
-              const Icon(Icons.chevron_right, color: Colors.white54),
-            ],
-          ),
+
+    // Thay InkWell bằng Card thường (Không bấm được)
+    return Card(
+      elevation: 4,
+      color: Colors.indigo.shade700,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildSummaryItem('Tổng Lương', formatCurrency(totalPayroll)),
+            _buildSummaryItem('Nhân viên', '$activeStaff'),
+            // Đã xóa Icon(Icons.chevron_right)
+          ],
         ),
       ),
     );
@@ -568,12 +613,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
         ),
       ],
     );
-  }
-
-  double _processPayrollData(List<StaffProfile> profiles) {
-    return profiles
-        .where((p) => p.status == 'active')
-        .fold(0.0, (sum, p) => sum + p.salary);
   }
 
   String _getWeekdayName(int weekday) {
