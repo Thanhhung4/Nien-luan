@@ -18,15 +18,14 @@ class AddExceptionDialog extends StatefulWidget {
   final OnSaveExceptionCallback onSave;
   final DateTime initialDate;
   final Map<String, List<String>> defaultSchedule;
-  final List<ScheduleExceptionModel>
-  existingExceptions; // <-- Nhận danh sách cũ để check
+  final List<ScheduleExceptionModel> existingExceptions;
 
   const AddExceptionDialog({
     super.key,
     required this.onSave,
     required this.initialDate,
     required this.defaultSchedule,
-    required this.existingExceptions, // <-- Bắt buộc
+    required this.existingExceptions,
   });
 
   @override
@@ -39,14 +38,20 @@ class _AddExceptionDialogState extends State<AddExceptionDialog> {
 
   late DateTime _selectedDate;
   ScheduleExceptionType _selectedType = ScheduleExceptionType.absent;
+
+  // Set lưu các ca được chọn (Dùng chung cho cả Làm thêm và Nghỉ/Trễ)
   final Set<String> _selectedShifts = {};
 
   final _penaltyController = TextEditingController(text: '0');
   final _bonusController = TextEditingController(text: '0');
   final _dateController = TextEditingController();
 
-  final List<String> _shiftOptions = ['Ca sáng', 'Ca chiều', 'Ca tối'];
+  // Danh sách tất cả các ca
+  final List<String> _allShiftOptions = ['Ca sáng', 'Ca chiều', 'Ca tối'];
   static const double _bonusPerShift = 100000;
+  // Mặc định phạt 50k nếu trễ (có thể sửa lại logic này nếu muốn tự nhân theo ca)
+  static const double _penaltyPerShift = 50000;
+
   final Map<int, String> _weekdayMap = {
     1: 'T2',
     2: 'T3',
@@ -61,7 +66,8 @@ class _AddExceptionDialogState extends State<AddExceptionDialog> {
   void initState() {
     super.initState();
     _selectedDate = widget.initialDate;
-    // Tìm ngày hợp lệ
+
+    // Tìm ngày hợp lệ ngay khi mở dialog
     if (!_selectableDayPredicate(_selectedDate)) {
       _selectedDate = _findNearestValidDate(widget.initialDate);
     }
@@ -83,22 +89,46 @@ class _AddExceptionDialogState extends State<AddExceptionDialog> {
     ).format(_selectedDate);
   }
 
-  // --- LOGIC KIỂM TRA ---
+  // --- LOGIC HỖ TRỢ ---
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
+  // Lấy danh sách ca ĐÃ CÓ LỊCH trong ngày
   List<String> _getScheduledShifts(DateTime day) {
     final weekdayKey = _weekdayMap[day.weekday];
     return widget.defaultSchedule[weekdayKey] ?? [];
   }
 
-  bool _hasWorkSchedule(DateTime day) => _getScheduledShifts(day).isNotEmpty;
-  bool _isDayFullyBooked(DateTime day) =>
-      _getScheduledShifts(day).length >= _shiftOptions.length;
+  bool _hasWorkSchedule(DateTime day) {
+    return _getScheduledShifts(day).isNotEmpty;
+  }
 
+  bool _isDayFullyBooked(DateTime day) {
+    final scheduled = _getScheduledShifts(day);
+    return scheduled.length >= _allShiftOptions.length;
+  }
+
+  // --- LOGIC CHẶN NGÀY ---
   bool _selectableDayPredicate(DateTime day) {
-    if (_selectedType == ScheduleExceptionType.extraShift) return true;
+    if (_selectedType == ScheduleExceptionType.extraShift) {
+      // Làm thêm: Được chọn nếu ngày đó chưa full lịch
+      return !_isDayFullyBooked(day);
+    }
+    // Nghỉ/Trễ: Phải chọn ngày CÓ LỊCH làm việc
     return _hasWorkSchedule(day);
+  }
+
+  // --- LOGIC LẤY CA KHẢ DỤNG ---
+  List<String> _getAvailableShifts(DateTime day) {
+    final scheduled = _getScheduledShifts(day);
+
+    if (_selectedType == ScheduleExceptionType.extraShift) {
+      // Làm thêm: Chỉ hiện các ca CHƯA có trong lịch
+      return _allShiftOptions.where((s) => !scheduled.contains(s)).toList();
+    } else {
+      // Nghỉ/Trễ: Chỉ hiện các ca ĐÃ có trong lịch (để báo nghỉ/trễ ca đó)
+      return scheduled;
+    }
   }
 
   DateTime _findNearestValidDate(DateTime start) {
@@ -113,30 +143,29 @@ class _AddExceptionDialogState extends State<AddExceptionDialog> {
     return start;
   }
 
-  List<String> _getAvailableShiftsForExtra(DateTime day) {
-    final scheduled = _getScheduledShifts(day);
-    return _shiftOptions.where((s) => !scheduled.contains(s)).toList();
-  }
-
-  void _calculateBonus() {
-    if (_selectedType == ScheduleExceptionType.extraShift) {
-      double total = _selectedShifts.length * _bonusPerShift;
-      _bonusController.text = total.toStringAsFixed(0);
-    } else {
-      _bonusController.text = '0';
-    }
-  }
-
   void _updateDefaultValues(ScheduleExceptionType type) {
-    if (type == ScheduleExceptionType.late) {
-      _penaltyController.text = '50000';
-      _bonusController.text = '0';
-    } else if (type == ScheduleExceptionType.unexcused) {
-      _penaltyController.text = '200000';
-      _bonusController.text = '0';
-    } else if (type == ScheduleExceptionType.extraShift) {
+    _selectedShifts.clear(); // Reset ca đã chọn khi đổi loại
+    _calculateMoney(); // Reset tiền
+  }
+
+  // Tự động tính tiền (Lương thêm hoặc Phạt gợi ý)
+  void _calculateMoney() {
+    int shiftCount = _selectedShifts.length;
+
+    if (_selectedType == ScheduleExceptionType.extraShift) {
+      double total = shiftCount * _bonusPerShift;
+      _bonusController.text = total.toStringAsFixed(0);
       _penaltyController.text = '0';
-      _calculateBonus();
+    } else if (_selectedType == ScheduleExceptionType.late) {
+      // Ví dụ: Trễ mỗi ca phạt 50k (hoặc giữ cố định tùy bạn)
+      double total = shiftCount * 50000;
+      _penaltyController.text = total.toStringAsFixed(0);
+      _bonusController.text = '0';
+    } else if (_selectedType == ScheduleExceptionType.unexcused) {
+      // Ví dụ: Nghỉ không phép mỗi ca phạt 200k
+      double total = shiftCount * 200000;
+      _penaltyController.text = total.toStringAsFixed(0);
+      _bonusController.text = '0';
     } else {
       _penaltyController.text = '0';
       _bonusController.text = '0';
@@ -147,6 +176,7 @@ class _AddExceptionDialogState extends State<AddExceptionDialog> {
     final initialPickerDate = _selectableDayPredicate(_selectedDate)
         ? _selectedDate
         : _findNearestValidDate(DateTime.now());
+
     final pickedDate = await showDatePicker(
       context: context,
       initialDate: initialPickerDate,
@@ -155,19 +185,19 @@ class _AddExceptionDialogState extends State<AddExceptionDialog> {
       selectableDayPredicate: _selectableDayPredicate,
       locale: const Locale('vi', 'VN'),
     );
+
     if (pickedDate != null) {
       setState(() {
         _selectedDate = pickedDate;
-        _selectedShifts.clear();
-        _calculateBonus();
+        _selectedShifts.clear(); // Reset ca khi đổi ngày
+        _calculateMoney();
         _updateDateText();
       });
     }
   }
 
-  // --- HÀM KIỂM TRA RÀNG BUỘC (QUAN TRỌNG) ---
+  // --- VALIDATE RULE PHỨC TẠP ---
   String? _validateRules() {
-    // Lấy danh sách ngoại lệ ĐÃ CÓ trong ngày được chọn
     final existingOnDate = widget.existingExceptions
         .where((e) => _isSameDay(e.date, _selectedDate))
         .toList();
@@ -186,92 +216,68 @@ class _AddExceptionDialogState extends State<AddExceptionDialog> {
     );
 
     // Rule 1: Không thêm Nghỉ/Trễ nếu đã có Làm thêm
-    if ((_selectedType == ScheduleExceptionType.absent ||
-            _selectedType == ScheduleExceptionType.unexcused ||
-            _selectedType == ScheduleExceptionType.late) &&
-        hasExtra) {
+    if ((_selectedType != ScheduleExceptionType.extraShift) && hasExtra) {
       return "Ngày này đã có lịch làm thêm, không thể báo nghỉ/trễ.";
     }
 
-    // Rule 2: Không thêm Làm thêm nếu đã Nghỉ (Có phép hoặc Không phép)
+    // Rule 2: Không thêm Làm thêm nếu đã Nghỉ
     if (_selectedType == ScheduleExceptionType.extraShift &&
         (hasAbsent || hasUnexcused)) {
       return "Nhân viên đã báo nghỉ ngày này, không thể làm thêm.";
     }
 
     // Rule 3: Không thêm Làm thêm nếu đã Đi trễ VÀ Ngày đó đã Kín lịch
-    // (Logic: Trễ + Full lịch = Phạt nặng, ko làm thêm. Trễ + Còn trống -> Cho làm bù)
     if (_selectedType == ScheduleExceptionType.extraShift &&
         hasLate &&
         _isDayFullyBooked(_selectedDate)) {
-      return "Ngày đã kín lịch và nhân viên đi trễ, không thể làm thêm.";
+      return "Ngày đã kín lịch và có báo trễ, không thể thêm ca làm thêm.";
     }
 
-    // Rule 4: Không được cùng ngày có 2 ngoại lệ loại (Nghỉ/Trễ)
-    if (_selectedType == ScheduleExceptionType.absent ||
-        _selectedType == ScheduleExceptionType.unexcused ||
-        _selectedType == ScheduleExceptionType.late) {
-      if (existingOnDate.any(
-        (e) =>
-            e.type == ScheduleExceptionType.absent ||
-            e.type == ScheduleExceptionType.unexcused ||
-            e.type == ScheduleExceptionType.late,
-      )) {
-        return "Ngày này đã có ghi nhận nghỉ hoặc đi trễ rồi.";
+    // Rule 4: Kiểm tra trùng ca
+    // Lấy tất cả các ca đã được ghi nhận trong ngày (từ tất cả các loại exception)
+    final Set<String> takenShifts = {};
+    for (var e in existingOnDate) {
+      if (e.shift != null) {
+        takenShifts.addAll(e.shift!.split(', '));
       }
     }
 
-    // Rule 5: Kiểm tra trùng ca làm thêm
-    if (_selectedType == ScheduleExceptionType.extraShift) {
-      // Lấy các ca làm thêm ĐÃ CÓ trong ngày
-      final existingExtraShifts = existingOnDate
-          .where(
-            (e) =>
-                e.type == ScheduleExceptionType.extraShift && e.shift != null,
-          )
-          .expand((e) => e.shift!.split(', '))
-          .toSet();
-
-      // Kiểm tra xem ca MỚI CHỌN có trùng với ca ĐÃ CÓ không
-      for (var shift in _selectedShifts) {
-        if (existingExtraShifts.contains(shift)) {
-          return "Ca '$shift' đã được đăng ký làm thêm rồi.";
-        }
+    // Nếu loại mới là Nghỉ/Trễ, cũng cần check xem ca đó đã báo nghỉ/trễ/làm thêm chưa
+    for (var shift in _selectedShifts) {
+      if (takenShifts.contains(shift)) {
+        return "Ca '$shift' đã được ghi nhận trong một ngoại lệ khác rồi.";
       }
     }
 
-    return null; // Không có lỗi
+    return null;
   }
 
   Future<void> _submit() async {
     if (_formKey.currentState?.validate() ?? false) {
-      // 1. Validate các lỗi logic ngày tháng thông thường
-      if (_selectedType == ScheduleExceptionType.extraShift) {
-        if (_selectedShifts.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Vui lòng chọn ít nhất 1 ca làm thêm'),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
-        }
-      } else {
-        if (!_hasWorkSchedule(_selectedDate)) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Ngày này không có lịch làm.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
-        }
+      // Validate cơ bản
+      if (!_selectableDayPredicate(_selectedDate)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ngày đã chọn không hợp lệ.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
       }
 
-      // 2. Validate các RULE PHỨC TẠP (MỚI)
+      if (_selectedShifts.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vui lòng chọn ít nhất 1 ca'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Validate Rules phức tạp
       final errorMsg = _validateRules();
       if (errorMsg != null) {
-        // Hiển thị Dialog cảnh báo lỗi thay vì Snackbar để người dùng đọc kỹ
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -290,19 +296,19 @@ class _AddExceptionDialogState extends State<AddExceptionDialog> {
 
       setState(() => _isLoading = true);
       try {
+        // Sắp xếp ca cho đẹp
         final sortedShifts = _selectedShifts.toList()
           ..sort(
-            (a, b) =>
-                _shiftOptions.indexOf(a).compareTo(_shiftOptions.indexOf(b)),
+            (a, b) => _allShiftOptions
+                .indexOf(a)
+                .compareTo(_allShiftOptions.indexOf(b)),
           );
         final shiftString = sortedShifts.join(', ');
 
         await widget.onSave(
           date: _selectedDate,
           type: _selectedType,
-          shift: _selectedType == ScheduleExceptionType.extraShift
-              ? shiftString
-              : null,
+          shift: shiftString, // Lưu chuỗi ca (cho cả Làm thêm và Nghỉ/Trễ)
           penalty: double.tryParse(_penaltyController.text) ?? 0,
           bonus: double.tryParse(_bonusController.text) ?? 0,
         );
@@ -327,10 +333,10 @@ class _AddExceptionDialogState extends State<AddExceptionDialog> {
 
     bool isDateError = false;
     String? dateErrorText;
+
+    // Logic báo lỗi UI
     if (isExtra) {
       if (_isDayFullyBooked(_selectedDate)) {
-        // Chỉ báo lỗi nếu ĐÃ FULL và KHÔNG CÓ Late (theo rule bổ sung thì Late + còn chỗ vẫn được làm)
-        // Nhưng ở đây chỉ cảnh báo UI, logic chính nằm ở _submit
         isDateError = true;
         dateErrorText = "Ngày này đã kín lịch (3 ca).";
       }
@@ -341,9 +347,18 @@ class _AddExceptionDialogState extends State<AddExceptionDialog> {
       }
     }
 
-    final availableShiftsForDate = isExtra
-        ? _getAvailableShiftsForExtra(_selectedDate)
-        : <String>[];
+    // Lấy danh sách ca phù hợp để hiển thị
+    final availableShiftsToSelect = _getAvailableShifts(_selectedDate);
+
+    // Tiêu đề cho phần chọn ca
+    String selectShiftLabel;
+    if (isExtra) {
+      selectShiftLabel = "Chọn ca làm thêm:";
+    } else if (_selectedType == ScheduleExceptionType.late) {
+      selectShiftLabel = "Chọn ca đi trễ:";
+    } else {
+      selectShiftLabel = "Chọn ca nghỉ:";
+    }
 
     return AlertDialog(
       title: const Text('Thêm Ngoại lệ'),
@@ -353,6 +368,7 @@ class _AddExceptionDialogState extends State<AddExceptionDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // 1. Loại ngoại lệ
               DropdownButtonFormField<ScheduleExceptionType>(
                 value: _selectedType,
                 decoration: const InputDecoration(
@@ -363,19 +379,16 @@ class _AddExceptionDialogState extends State<AddExceptionDialog> {
                     vertical: 16,
                   ),
                 ),
-                items: ScheduleExceptionType.values
-                    .map(
-                      (type) => DropdownMenuItem(
-                        value: type,
-                        child: Text(type.display),
-                      ),
-                    )
-                    .toList(),
+                items: ScheduleExceptionType.values.map((type) {
+                  return DropdownMenuItem(
+                    value: type,
+                    child: Text(type.display),
+                  );
+                }).toList(),
                 onChanged: (value) {
                   if (value != null) {
                     setState(() {
                       _selectedType = value;
-                      _selectedShifts.clear();
                       _updateDefaultValues(value);
                       if (!_selectableDayPredicate(_selectedDate)) {
                         _selectedDate = _findNearestValidDate(DateTime.now());
@@ -386,6 +399,8 @@ class _AddExceptionDialogState extends State<AddExceptionDialog> {
                 },
               ),
               const SizedBox(height: 16),
+
+              // 2. Chọn ngày
               InkWell(
                 onTap: _pickDate,
                 child: InputDecorator(
@@ -405,46 +420,54 @@ class _AddExceptionDialogState extends State<AddExceptionDialog> {
                 ),
               ),
               const SizedBox(height: 16),
-              if (isExtra) ...[
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    availableShiftsForDate.isEmpty
-                        ? "Không có ca trống"
-                        : "Chọn ca làm thêm (còn trống):",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: availableShiftsForDate.isEmpty
-                          ? Colors.grey
-                          : Colors.black,
-                    ),
+
+              // 3. CHỌN CA (ÁP DỤNG CHO TẤT CẢ LOẠI)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  availableShiftsToSelect.isEmpty
+                      ? (isExtra
+                            ? "Không có ca trống để làm thêm"
+                            : "Không có ca làm việc để báo nghỉ/trễ")
+                      : selectShiftLabel,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: availableShiftsToSelect.isEmpty
+                        ? Colors.red
+                        : Colors.black,
                   ),
                 ),
-                const SizedBox(height: 8),
-                if (availableShiftsForDate.isNotEmpty)
-                  Wrap(
-                    spacing: 8.0,
-                    children: availableShiftsForDate.map((shift) {
-                      final isSelected = _selectedShifts.contains(shift);
-                      return FilterChip(
-                        label: Text(shift),
-                        selected: isSelected,
-                        selectedColor: Colors.green.shade100,
-                        checkmarkColor: Colors.green,
-                        onSelected: (bool selected) {
-                          setState(() {
-                            if (selected)
-                              _selectedShifts.add(shift);
-                            else
-                              _selectedShifts.remove(shift);
-                            _calculateBonus();
-                          });
-                        },
-                      );
-                    }).toList(),
-                  ),
-                const SizedBox(height: 16),
-              ],
+              ),
+              const SizedBox(height: 8),
+
+              if (availableShiftsToSelect.isNotEmpty)
+                Wrap(
+                  spacing: 8.0,
+                  children: availableShiftsToSelect.map((shift) {
+                    final isSelected = _selectedShifts.contains(shift);
+                    return FilterChip(
+                      label: Text(shift),
+                      selected: isSelected,
+                      selectedColor: isExtra
+                          ? Colors.green.shade100
+                          : Colors.orange.shade100,
+                      checkmarkColor: isExtra ? Colors.green : Colors.orange,
+                      onSelected: (bool selected) {
+                        setState(() {
+                          if (selected) {
+                            _selectedShifts.add(shift);
+                          } else {
+                            _selectedShifts.remove(shift);
+                          }
+                          _calculateMoney();
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              const SizedBox(height: 16),
+
+              // 4. Tiền Phạt
               if (isPunishment)
                 TextFormField(
                   controller: _penaltyController,
@@ -457,6 +480,8 @@ class _AddExceptionDialogState extends State<AddExceptionDialog> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 ),
+
+              // 5. Tiền Lương thêm
               if (isExtra)
                 TextFormField(
                   controller: _bonusController,
