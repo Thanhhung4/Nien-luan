@@ -10,7 +10,6 @@ import 'package:myshop/models/schedule_exception.dart'; // <-- Import mới
 import 'package:myshop/services/pocketbase_service.dart';
 import 'package:myshop/utils/currency_formatter.dart';
 import 'package:pocketbase/pocketbase.dart';
-import 'salary_detail_screen.dart';
 
 class DailyRevenue {
   final DateTime date;
