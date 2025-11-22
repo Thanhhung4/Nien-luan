@@ -275,7 +275,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   void _printToConsole() {
     // Giả lập việc in hóa đơn ra console (fallback)
     print('=== HOA DON THANH TOAN ===');
-    print('Ca phe CT484');
+    print('The 04siCafe');
     print('Dia chi: Ninh Kieu, Can Tho');
     print('Loai: Tai quan');
     print('Ma hoa don: $invoiceId');
