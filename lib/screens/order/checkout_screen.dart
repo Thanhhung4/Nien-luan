@@ -41,7 +41,7 @@ class CheckoutScreen extends StatelessWidget {
           children: [
             Center(
               child: Text(
-                'CÀ PHÊ CT484', // Tên quán (Bạn có thể đổi)
+                '04siCafe', // Tên quán (Bạn có thể đổi)
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),

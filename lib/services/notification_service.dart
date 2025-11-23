@@ -69,4 +69,13 @@ class NotificationService {
       throw Exception('Failed to delete notification: $e');
     }
   }
+
+  // --- HÀM MỚI: MARK AS READ ---
+  Future<void> markAsRead(String id) async {
+    try {
+      await pb.collection('notifications').update(id, body: {'isRead': true});
+    } catch (e) {
+      throw Exception('Failed to mark notification as read: $e');
+    }
+  }
 }

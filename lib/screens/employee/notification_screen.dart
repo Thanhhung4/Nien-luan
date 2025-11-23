@@ -50,12 +50,28 @@ class _NotificationScreenState extends State<NotificationScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () async {
+              // Mark notification as read in database
+              await _markNotificationAsRead(notif.id);
+              if (mounted) {
+                Navigator.of(context).pop();
+                _loadNotifications(); // Refresh list
+              }
+            },
             child: const Text('Đã hiểu'),
           ),
         ],
       ),
     );
+  }
+
+  // Mark notification as read in database
+  Future<void> _markNotificationAsRead(String notificationId) async {
+    try {
+      await pbService.notifications.markAsRead(notificationId);
+    } catch (e) {
+      debugPrint('Error marking notification as read: $e');
+    }
   }
 
   @override

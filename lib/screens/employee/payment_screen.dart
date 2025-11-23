@@ -318,7 +318,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Text(
-                      'Cà phê CT484',
+                      '04siCafe',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,

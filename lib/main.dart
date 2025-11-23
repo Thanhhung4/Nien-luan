@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'routes/app_routes.dart';
 import 'screens/auth/login_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -37,7 +38,20 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Quản lý nhà hàng',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+          useMaterial3: true,
+          fontFamily: 'Noto Sans',
+          textTheme: GoogleFonts.notoSansTextTheme().apply(
+            bodyColor: Colors.black87,
+            displayColor: Colors.black,
+          ),
+          scaffoldBackgroundColor: Colors.white,
+          textSelectionTheme: TextSelectionThemeData(
+            selectionColor: Colors.blue.withOpacity(0.3),
+            selectionHandleColor: Colors.blue,
+          ),
+        ),
         // --- THÊM CÁC DÒNG NÀY ĐỂ CẤU HÌNH LOCALE ---
         localizationsDelegates: const [
           GlobalMaterialLocalizations.delegate,

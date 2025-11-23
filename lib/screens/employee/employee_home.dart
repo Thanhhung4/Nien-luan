@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 import 'package:myshop/models/cart_item.dart';
 import 'package:myshop/models/menu_item.dart';
 import 'package:myshop/screens/auth/login_screen.dart';
 import 'package:myshop/screens/employee/employee_profile_screen.dart';
 import 'package:myshop/screens/employee/order_details_screen.dart';
+import 'package:myshop/screens/employee/notification_screen.dart';
 import 'package:myshop/screens/order/completed_orders_screen.dart';
 import 'package:myshop/services/pocketbase_service.dart';
 import 'package:myshop/utils/currency_formatter.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/menu_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/notification_provider.dart';
 
 class EmployeeHome extends StatefulWidget {
   const EmployeeHome({super.key});
@@ -26,6 +29,7 @@ class _EmployeeHomeState extends State<EmployeeHome> {
 
   String _searchQuery = '';
   bool _isProcessingOrder = false;
+  Timer? _notificationTimer;
 
   @override
   void initState() {
@@ -34,13 +38,45 @@ class _EmployeeHomeState extends State<EmployeeHome> {
     // Load menu khi vào trang
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MenuProvider>().loadMenu();
+      _loadNotificationsFromDatabase();
+
+      // Set up periodic notification check (every 30 seconds)
+      _notificationTimer = Timer.periodic(
+        const Duration(seconds: 30),
+        (timer) => _loadNotificationsFromDatabase(),
+      );
     });
+  }
+
+  // Load notifications từ database vào NotificationProvider
+  Future<void> _loadNotificationsFromDatabase() async {
+    try {
+      final notifications = await pbService.notifications.getNotifications();
+      final notificationProvider = context.read<NotificationProvider>();
+
+      // Clear existing notifications and add only unread ones from database
+      notificationProvider.clearAll();
+
+      for (final notif in notifications) {
+        // Only add unread notifications to show badge
+        if (!notif.isRead) {
+          notificationProvider.addNotification(
+            title: notif.title,
+            message: notif.content,
+            type: NotificationType.system, // Default type
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading notifications: $e');
+    }
   }
 
   @override
   void dispose() {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
+    _notificationTimer?.cancel();
     super.dispose();
   }
 
@@ -110,6 +146,17 @@ class _EmployeeHomeState extends State<EmployeeHome> {
     );
   }
 
+  void _openNotifications() {
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(builder: (context) => const NotificationScreen()),
+        )
+        .then((_) {
+          // Mark all as read when returning from notification screen
+          context.read<NotificationProvider>().markAllAsRead();
+        });
+  }
+
   Future<void> _showAddNoteDialog(CartItem cartItem) async {
     final cartProvider = context.read<CartProvider>();
     final noteController = TextEditingController(text: cartItem.notes);
@@ -158,6 +205,53 @@ class _EmployeeHomeState extends State<EmployeeHome> {
           onPressed: _openProfile,
         ),
         actions: [
+          // Bell icon with notification badge
+          Consumer<NotificationProvider>(
+            builder: (context, notificationProvider, child) {
+              final unreadCount = notificationProvider.unreadCount;
+              debugPrint('Badge rebuilt: unreadCount = $unreadCount');
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications, color: Colors.white),
+                    tooltip: 'Thông báo',
+                    onPressed: _openNotifications,
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 2,
+                            ),
+                          ],
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          unreadCount > 99 ? '99+' : '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.receipt_long, color: Colors.white),
             tooltip: 'Hóa đơn đã hoàn thành',

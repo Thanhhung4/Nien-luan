@@ -152,7 +152,11 @@ class NotificationProvider extends ChangeNotifier {
     _playNotificationSignal(priority);
 
     debugPrint('Notification added: ${notification.title}');
+    debugPrint(
+      'Total notifications: ${_notifications.length}, Unread: ${unreadCount}',
+    );
     notifyListeners();
+    debugPrint('notifyListeners() called');
   }
 
   /// Quick add methods for common notification types

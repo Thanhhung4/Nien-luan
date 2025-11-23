@@ -1,6 +1,6 @@
 name: myshop
-description: 'A new Flutter project.'
-publish_to: 'none'
+description: "A new Flutter project."
+publish_to: "none"
 
 version: 1.0.0+1
 
@@ -13,6 +13,7 @@ dependencies:
   flutter_localizations: # <--- THÊM DÒNG NÀY
     sdk: flutter
   flutter_launcher_icons: ^0.13.1
+  google_fonts: ^6.2.1
   http: ^1.5.0
   shared_preferences: ^2.5.3
   flutter_dotenv: ^5.2.1
