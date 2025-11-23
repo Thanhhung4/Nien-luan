@@ -72,12 +72,6 @@ class _EditEmployeeDialogState extends State<EditEmployeeDialog> {
     if (_formKey.currentState?.validate() ?? false) {
       setState(() => _isLoading = true);
 
-      String? newEmail;
-      if (widget.profile.hasLoginAccount &&
-          emailController.text != widget.profile.email) {
-        newEmail = emailController.text;
-      }
-
       String? newPassword;
       if (widget.profile.hasLoginAccount &&
           passwordController.text.isNotEmpty) {
@@ -91,7 +85,7 @@ class _EditEmployeeDialogState extends State<EditEmployeeDialog> {
           role: _selectedRole, // Role giữ nguyên
           status: _selectedStatus,
           userId: widget.profile.userId,
-          newEmail: newEmail,
+          newEmail: null, // Email không được thay đổi
           newPassword: newPassword,
         );
         if (mounted) Navigator.of(context).pop();
@@ -181,10 +175,15 @@ class _EditEmployeeDialogState extends State<EditEmployeeDialog> {
 
                 TextFormField(
                   controller: emailController,
-                  decoration: const InputDecoration(labelText: 'Email*'),
-                  validator: (v) => (v == null || !v.contains('@'))
-                      ? 'Email sai định dạng'
-                      : null,
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    labelText: 'Email (Không thể thay đổi)',
+                    prefixIcon: const Icon(Icons.email),
+                    border: const OutlineInputBorder(),
+                    fillColor: Colors.grey.shade200,
+                    filled: true,
+                  ),
+                  style: TextStyle(color: Colors.grey.shade700),
                 ),
                 const SizedBox(height: 10),
 

@@ -46,6 +46,83 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     }
   }
 
+  void _showDeleteConfirmDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Xác nhận xóa'),
+          content: Text(
+            'Bạn có chắc chắn muốn xóa nhân viên "${_currentProfile.name}"?\n\nHành động này không thể hoàn tác.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop(); // Đóng dialog
+                await _deleteEmployee();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Xóa'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteEmployee() async {
+    try {
+      // Hiển thị loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return const Center(child: CircularProgressIndicator());
+        },
+      );
+
+      // Xóa nhân viên khỏi database
+      await PocketBaseService.instance.users.deleteStaffProfile(
+        _currentProfile,
+      );
+
+      // Đóng loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      // Quay về màn hình trước và cập nhật danh sách
+      if (mounted) {
+        widget.onProfileUpdated();
+        Navigator.of(context).pop();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đã xóa nhân viên "${_currentProfile.name}"'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Đóng loading dialog nếu có lỗi
+      if (mounted) Navigator.of(context).pop();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi xóa nhân viên: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   void _showEditEmployeeDialog() {
     showDialog(
       context: context,
@@ -104,12 +181,27 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
       body: ListView(
         children: [_buildHeader(), _buildInfoCard(), _buildScheduleButton()],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showEditEmployeeDialog,
-        icon: const Icon(Icons.edit),
-        label: const Text('Chỉnh sửa'),
-        backgroundColor: Colors.indigo,
-        foregroundColor: Colors.white,
+      floatingActionButton: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            onPressed: _showDeleteConfirmDialog,
+            icon: const Icon(Icons.delete),
+            label: const Text('Xóa nhân viên'),
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+            heroTag: "delete",
+          ),
+          const SizedBox(width: 16),
+          FloatingActionButton.extended(
+            onPressed: _showEditEmployeeDialog,
+            icon: const Icon(Icons.edit),
+            label: const Text('Chỉnh sửa'),
+            backgroundColor: Colors.indigo,
+            foregroundColor: Colors.white,
+            heroTag: "edit",
+          ),
+        ],
       ),
     );
   }

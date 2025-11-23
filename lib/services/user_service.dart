@@ -149,8 +149,13 @@ class UserService {
           .update(profileId, body: profileBody);
 
       if (userId != null && (newEmail != null || newPassword != null)) {
+        // Get current user data to compare email
+        final currentUser = await pb.collection('users').getOne(userId);
+        final currentEmail = currentUser.getStringValue('email');
+
         final userBody = <String, dynamic>{};
-        if (newEmail != null) {
+        if (newEmail != null && newEmail != currentEmail) {
+          // Only update email if it's different from current email
           userBody['email'] = newEmail;
           userBody['emailVisibility'] = true;
         }
@@ -158,15 +163,61 @@ class UserService {
           userBody['password'] = newPassword;
           userBody['passwordConfirm'] = newPassword;
         }
-        await pb.collection('users').update(userId, body: userBody);
+
+        // Only update if there are changes to make
+        if (userBody.isNotEmpty) {
+          await pb.collection('users').update(userId, body: userBody);
+        }
       }
     } catch (e) {
       print('UserService - Error updating details: $e');
-      if (e is ClientException && e.response.containsKey('data')) {
-        final errors = e.response['data'] as Map<String, dynamic>;
-        if (errors.containsKey('email')) {
-          throw Exception('Email này đã tồn tại.');
+      if (e is ClientException) {
+        print('ClientException response: ${e.response}');
+
+        // Check for specific error patterns
+        final responseString = e.response.toString();
+
+        // Check for email validation errors
+        if (responseString.contains('email') &&
+            (responseString.contains('already exists') ||
+                responseString.contains('đã tồn tại') ||
+                responseString.contains('duplicate'))) {
+          throw Exception('Email này đã được sử dụng bởi tài khoản khác.');
         }
+
+        // Check for user validation errors
+        if (responseString.contains('user') &&
+            (responseString.contains('already exists') ||
+                responseString.contains('đã tồn tại'))) {
+          throw Exception('Tài khoản này đã tồn tại.');
+        }
+
+        // If it's a data validation error, try to extract the field
+        if (e.response.containsKey('data')) {
+          final errors = e.response['data'] as Map<String, dynamic>;
+          print('Error data fields: ${errors.keys.toList()}');
+
+          // Handle specific field errors
+          if (errors.containsKey('email')) {
+            final emailError = errors['email'];
+            print('Email error details: $emailError');
+            throw Exception('Lỗi email: ${emailError.toString()}');
+          }
+
+          if (errors.containsKey('username')) {
+            final usernameError = errors['username'];
+            print('Username error details: $usernameError');
+            throw Exception('Lỗi tên người dùng: ${usernameError.toString()}');
+          }
+
+          // Generic field error
+          final firstErrorKey = errors.keys.first;
+          final firstError = errors[firstErrorKey];
+          throw Exception('Lỗi ${firstErrorKey}: ${firstError.toString()}');
+        }
+
+        // Generic PocketBase error
+        throw Exception('Lỗi cập nhật: ${e.response}');
       }
       throw Exception('Failed to update staff details: $e');
     }
