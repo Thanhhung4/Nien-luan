@@ -112,17 +112,13 @@ class _EmployeeHomeState extends State<EmployeeHome> {
     }
 
     // Chuyển đến trang chi tiết đặt món
-    Navigator.of(context)
-        .push(
-          MaterialPageRoute(
-            builder: (context) =>
-                OrderDetailsScreen(cartItems: cartProvider.cartItems),
-          ),
-        )
-        .then((_) {
-          // Sau khi quay về từ trang chi tiết, clear giỏ hàng
-          cartProvider.clear();
-        });
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            OrderDetailsScreen(cartItems: cartProvider.cartItems),
+      ),
+    );
+    // Removed: cartProvider.clear() - Keep cart items when returning
   }
 
   void _logout(BuildContext context) {

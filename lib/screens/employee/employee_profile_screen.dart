@@ -101,15 +101,22 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
 
     // Hiển thị khi đã có profile
     return ListView(
+      padding: const EdgeInsets.only(bottom: 16),
       children: [
         UserAccountsDrawerHeader(
           accountName: Text(
             currentProfile!.name.isNotEmpty
                 ? currentProfile!.name
                 : 'Chưa cập nhật tên',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
-          accountEmail: Text(currentProfile!.email),
+          accountEmail: Text(
+            currentProfile!.email,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
           currentAccountPicture: CircleAvatar(
             backgroundColor: Colors.white,
             child: Text(
@@ -129,13 +136,19 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
         // --- PHẦN CHỨC NĂNG ---
         ListTile(
           leading: const Icon(Icons.edit_note),
-          title: const Text('Chỉnh sửa thông tin'),
+          title: const Text(
+            'Chỉnh sửa thông tin',
+            overflow: TextOverflow.ellipsis,
+          ),
           trailing: const Icon(Icons.chevron_right),
           onTap: _navigateToEditProfile,
         ),
         ListTile(
           leading: const Icon(Icons.calendar_month),
-          title: const Text('Xem lịch làm việc'),
+          title: const Text(
+            'Xem lịch làm việc',
+            overflow: TextOverflow.ellipsis,
+          ),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
             if (currentProfile != null) {
@@ -148,7 +161,7 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
         ),
         ListTile(
           leading: const Icon(Icons.notifications),
-          title: const Text('Thông báo'),
+          title: const Text('Thông báo', overflow: TextOverflow.ellipsis),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
             _navigateTo(const NotificationScreen());

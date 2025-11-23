@@ -5,7 +5,6 @@ import 'package:myshop/models/staff_profile.dart';
 import 'package:myshop/widgets/manager/edit_employee_dialog.dart';
 import 'package:myshop/services/pocketbase_service.dart';
 import 'package:myshop/models/staff_role.dart';
-import 'package:myshop/utils/currency_formatter.dart';
 import 'package:myshop/screens/manager/single_employee_salary_screen.dart';
 import 'package:myshop/screens/manager/staff_schedule_detail_screen.dart';
 
@@ -227,20 +226,26 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
             children: [
               Icon(Icons.calendar_month, color: Colors.teal.shade400, size: 24),
               const SizedBox(width: 16),
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Lịch làm việc & Vi phạm',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    'Xem lịch cố định, thêm ngày nghỉ/đi trễ...',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Lịch làm việc & Vi phạm',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const Text(
+                      'Xem lịch cố định, thêm ngày nghỉ/đi trễ...',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-              const Spacer(),
               const Icon(Icons.chevron_right, color: Colors.grey),
             ],
           ),

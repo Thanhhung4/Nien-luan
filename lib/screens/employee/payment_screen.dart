@@ -573,6 +573,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           child: ElevatedButton.icon(
                             onPressed: () {
                               _printInvoice();
+                              // Clear cart after successful payment
+                              context.read<CartProvider>().clear();
                               // Delay để cho thấy hiệu ứng in, sau đó chuyển về trang chủ
                               Future.delayed(const Duration(seconds: 2), () {
                                 if (mounted) {
@@ -608,6 +610,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                 ),
                               );
 
+                              // Clear cart after successful payment
+                              context.read<CartProvider>().clear();
                               // Chuyển về trang chủ mà không in
                               Navigator.of(
                                 context,

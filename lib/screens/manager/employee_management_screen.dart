@@ -6,7 +6,6 @@ import 'package:myshop/models/staff_profile.dart';
 import 'package:myshop/models/staff_role.dart';
 import 'package:myshop/widgets/manager/employee_list_view.dart';
 import 'package:myshop/widgets/manager/add_employee_dialog.dart';
-import 'package:myshop/widgets/manager/edit_employee_dialog.dart';
 import 'package:myshop/screens/manager/employee_detail_screen.dart';
 
 class EmployeeManagementScreen extends StatefulWidget {

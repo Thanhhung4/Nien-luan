@@ -66,30 +66,6 @@ class _CompletedOrdersScreenState extends State<CompletedOrdersScreen> {
     }
   }
 
-  // Hàm hiển thị Date Picker (chọn ngày)
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate ?? DateTime.now(),
-      firstDate: DateTime.now().subtract(const Duration(days: 30)),
-      lastDate: DateTime.now(),
-    );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked; // Cập nhật ngày
-        _ordersFuture = _loadOrders(); // Tải lại dữ liệu
-      });
-    }
-  }
-
-  // Hàm xóa bộ lọc ngày
-  void _clearDateFilter() {
-    setState(() {
-      _selectedDate = null;
-      _ordersFuture = _loadOrders(); // Tải lại (về 30 ngày)
-    });
-  }
-
   // Xử lý khi bấm vào chi tiết
   void _navigateToDetail(OrderViewModel order) {
     Navigator.of(context)
@@ -119,21 +95,6 @@ class _CompletedOrdersScreenState extends State<CompletedOrdersScreen> {
         title: Text(_getTitle()), // Tiêu đề động
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
-        actions: [
-          // Nút chọn ngày
-          IconButton(
-            icon: const Icon(Icons.calendar_month),
-            tooltip: 'Chọn ngày',
-            onPressed: () => _selectDate(context),
-          ),
-          // Nút xóa chọn ngày (chỉ hiện khi đã chọn)
-          if (_selectedDate != null)
-            IconButton(
-              icon: const Icon(Icons.clear_all),
-              tooltip: 'Xem 30 ngày',
-              onPressed: _clearDateFilter,
-            ),
-        ],
       ),
       body: Column(
         children: [
