@@ -23,6 +23,17 @@ class ManagerHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Responsive design: điều chỉnh số cột theo kích thước màn hình
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossAxisCount = screenWidth > 900
+        ? 4 // Desktop: 4 cột
+        : screenWidth > 600
+        ? 3 // Tablet: 3 cột
+        : 2; // Mobile: 2 cột
+
+    final padding = screenWidth > 600 ? 24.0 : 16.0;
+    final spacing = screenWidth > 600 ? 20.0 : 16.0;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Trang Quản lý'),
@@ -36,11 +47,11 @@ class ManagerHome extends StatelessWidget {
         ],
       ),
       body: GridView.count(
-        crossAxisCount: 2,
-        padding: const EdgeInsets.all(16.0),
+        crossAxisCount: crossAxisCount,
+        padding: EdgeInsets.all(padding),
         childAspectRatio: 1.1,
-        crossAxisSpacing: 16.0,
-        mainAxisSpacing: 16.0,
+        crossAxisSpacing: spacing,
+        mainAxisSpacing: spacing,
         children: [
           _buildDashboardButton(
             context,
