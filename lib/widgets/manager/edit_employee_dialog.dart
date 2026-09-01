@@ -137,7 +137,7 @@ class _EditEmployeeDialogState extends State<EditEmployeeDialog> {
 
               // -------- TRẠNG THÁI --------
               DropdownButtonFormField<String>(
-                value: _selectedStatus,
+                initialValue: _selectedStatus,
                 decoration: const InputDecoration(labelText: 'Trạng thái'),
                 items: _statusOptions
                     .map((s) => DropdownMenuItem(value: s, child: Text(s)))

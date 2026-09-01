@@ -10,7 +10,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_localizations: # <--- THÊM DÒNG NÀY
+  flutter_localizations: 
     sdk: flutter
   flutter_launcher_icons: ^0.13.1
   google_fonts: ^6.2.1
@@ -41,9 +41,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-
   assets:
     - .env
+    - assets/icon/
+    - assets/images/
 
 flutter_launcher_icons:
   android: true

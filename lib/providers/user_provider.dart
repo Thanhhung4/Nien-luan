@@ -14,7 +14,7 @@ class UserProvider extends ChangeNotifier {
   // State variables
   List<StaffProfile> _allStaff = [];
   List<StaffProfile> _activeStaff = [];
-  Map<String, WorkStatus> _staffWorkStatus = {};
+  final Map<String, WorkStatus> _staffWorkStatus = {};
   bool _isLoading = false;
   String? _error;
 

@@ -21,7 +21,7 @@ class OrderProvider extends ChangeNotifier {
 
   // Real-time order tracking
   OrderViewModel? _currentOrder;
-  Map<String, OrderStatus> _orderStatuses = {};
+  final Map<String, OrderStatus> _orderStatuses = {};
 
   // Getters
   List<OrderViewModel> get orders => _orders;

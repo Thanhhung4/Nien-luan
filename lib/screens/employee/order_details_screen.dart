@@ -7,8 +7,7 @@ import 'payment_screen.dart';
 class OrderDetailsScreen extends StatelessWidget {
   final List<CartItem> cartItems;
 
-  const OrderDetailsScreen({Key? key, required this.cartItems})
-    : super(key: key);
+  const OrderDetailsScreen({super.key, required this.cartItems});
 
   void _proceedToPayment(BuildContext context) {
     final cartProvider = context.read<CartProvider>();

@@ -166,61 +166,206 @@ class InventoryService {
   // 3. TRỪ KHO TỰ ĐỘNG (FIFO)
   // ============================================
 
+  Future<bool> _canReadRecord(String collection, String recordId) async {
+    try {
+      await pb.collection(collection).getOne(recordId);
+      return true;
+    } on ClientException catch (e) {
+      if (e.statusCode == 404) return false;
+      rethrow;
+    }
+  }
+
+  bool _looksLikePocketBaseId(String value) {
+    return RegExp(r'^[a-z0-9]{15}$', caseSensitive: false).hasMatch(value);
+  }
+
   Future<void> deductStockForOrder(List<OrderItemView> itemsInOrder) async {
     print('Bắt đầu trừ kho FIFO...');
     final Map<String, double> totalNeededMap = {};
 
+    final validMenuItemIds = itemsInOrder
+        .map((item) => item.menuItem.id.trim())
+        .where((id) => _looksLikePocketBaseId(id))
+        .toSet()
+        .toList();
+
+    if (validMenuItemIds.isEmpty) {
+      print(
+        'Không có menu_item hợp lệ để trừ kho (món đã bị xóa hoặc id không hợp lệ).',
+      );
+      return;
+    }
+
+    // Filter theo relation id (PocketBase): menu_item = "<id>"
     final menuItemIdFilter =
-        '(${itemsInOrder.map((item) => "menu_item.id = '${item.menuItem.id}'").join(' || ')})';
-    if (menuItemIdFilter == '()') return;
+        '(${validMenuItemIds.map((id) => "menu_item = \"$id\"").join(' || ')})';
 
     final allRecipes = await pb
         .collection('menu_item_ingredients')
         .getFullList(filter: menuItemIdFilter);
 
     for (final itemInOrder in itemsInOrder) {
+      final menuItemId = itemInOrder.menuItem.id.trim();
+      if (!_looksLikePocketBaseId(menuItemId)) {
+        // Skip deleted/invalid menu item entries
+        continue;
+      }
       final recipes = allRecipes.where(
-        (r) => r.getStringValue('menu_item') == itemInOrder.menuItem.id,
+        (r) => r.getStringValue('menu_item') == menuItemId,
       );
       for (final recipe in recipes) {
-        final ingId = recipe.getStringValue('ingredient');
+        final ingId = recipe.getStringValue('ingredient').trim();
+        if (!_looksLikePocketBaseId(ingId)) {
+          // Ingredient relation missing/deleted -> avoid 404 updates
+          print(
+            'Bỏ qua công thức thiếu nguyên liệu: menu_item=$menuItemId ingredient="$ingId"',
+          );
+          continue;
+        }
         final qty = recipe.getDoubleValue('quantity_needed');
         totalNeededMap[ingId] =
             (totalNeededMap[ingId] ?? 0) + (qty * itemInOrder.quantity);
       }
     }
 
+    if (totalNeededMap.isEmpty) {
+      print(
+        'Không có nguyên liệu nào cần trừ (công thức trống hoặc thiếu liên kết).',
+      );
+      return;
+    }
+
+    // PRE-CHECK:
+    // - Luôn đảm bảo `ingredients.stock_quantity` đủ.
+    // - Nếu có batches (FIFO) thì tổng batch phải đủ.
+    // - Nếu KHÔNG có batch nào thì vẫn cho phép trừ trực tiếp trên `ingredients.stock_quantity`.
+    final ingredientIds = totalNeededMap.keys.toList();
+    final ingredientFilter =
+        '(${ingredientIds.map((id) => 'id = "$id"').join(' || ')})';
+    final ingredientRecords = await pb
+        .collection('ingredients')
+        .getFullList(filter: ingredientFilter);
+    final Map<String, double> stockById = {
+      for (final r in ingredientRecords)
+        r.id: r.getDoubleValue('stock_quantity'),
+    };
+    final Map<String, String> nameById = {
+      for (final r in ingredientRecords) r.id: r.getStringValue('name'),
+    };
+
+    final List<String> insufficient = [];
+    final Map<String, List<IngredientBatch>> batchesByIngredientId = {};
+
+    for (final entry in totalNeededMap.entries) {
+      final ingredientId = entry.key;
+      final needed = entry.value;
+      final name = (nameById[ingredientId] ?? '').trim();
+      final label = name.isNotEmpty ? '$name (id=$ingredientId)' : ingredientId;
+
+      final stock = stockById[ingredientId];
+      if (stock == null) {
+        insufficient.add('Nguyên liệu không tồn tại: $label');
+        continue;
+      }
+      if (stock + 1e-9 < needed) {
+        insufficient.add('Thiếu nguyên liệu ($label): cần $needed, còn $stock');
+        continue;
+      }
+
+      final batches = await getBatchesForIngredient(ingredientId);
+      batchesByIngredientId[ingredientId] = batches;
+      if (batches.isNotEmpty) {
+        final batchSum = batches.fold<double>(0.0, (s, b) => s + b.quantity);
+        if (batchSum + 1e-9 < needed) {
+          insufficient.add(
+            'Thiếu lô FIFO ($label): cần $needed, tổng lô còn $batchSum (stock=$stock)',
+          );
+        }
+      }
+    }
+
+    if (insufficient.isNotEmpty) {
+      throw Exception(
+        'Không đủ nguyên liệu để thanh toán:\n\n${insufficient.join('\n')}',
+      );
+    }
+
     for (final entry in totalNeededMap.entries) {
       String ingredientId = entry.key;
       double amountNeeded = entry.value;
 
-      final batches = await getBatchesForIngredient(ingredientId);
+      final batches =
+          batchesByIngredientId[ingredientId] ??
+          await getBatchesForIngredient(ingredientId);
 
       for (final batch in batches) {
         if (amountNeeded <= 0) break;
 
-        double deductAmount = 0;
-        if (batch.quantity >= amountNeeded) {
-          deductAmount = amountNeeded;
-          amountNeeded = 0;
-        } else {
-          deductAmount = batch.quantity;
-          amountNeeded -= batch.quantity;
-        }
+        final double deductAmount = batch.quantity >= amountNeeded
+            ? amountNeeded
+            : batch.quantity;
 
-        await pb
-            .collection('ingredient_batches')
-            .update(batch.id, body: {'quantity-': deductAmount});
+        try {
+          await pb
+              .collection('ingredient_batches')
+              .update(batch.id, body: {'quantity-': deductAmount});
+
+          amountNeeded -= deductAmount;
+        } on ClientException catch (e) {
+          if (e.statusCode == 404) {
+            // PocketBase often returns 404 when update is denied by rules.
+            // If batches can't be updated, fall back to decrementing only
+            // `ingredients.stock_quantity` so checkout can still proceed.
+            final canRead = await _canReadRecord(
+              'ingredient_batches',
+              batch.id,
+            );
+            if (canRead) {
+              print(
+                'Warning: Không thể update ingredient_batches (batchId=${batch.id}) do PocketBase rules. '
+                'Bỏ qua FIFO batches và chỉ trừ ingredients.stock_quantity cho ingredientId=$ingredientId.',
+              );
+              // Stop trying to update FIFO batches for this ingredient.
+              amountNeeded = 0;
+              break;
+            }
+
+            // Batch record might have been deleted or is not readable.
+            // Skip this batch and continue best-effort.
+            print(
+              'Warning: ingredient_batches batchId=${batch.id} không tồn tại hoặc không đọc được (404). '
+              'Bỏ qua batch này và tiếp tục trừ theo ingredients.stock_quantity.',
+            );
+            continue;
+          }
+          rethrow;
+        }
       }
 
-      await pb
-          .collection('ingredients')
-          .update(ingredientId, body: {'stock_quantity-': entry.value});
+      try {
+        await pb
+            .collection('ingredients')
+            .update(ingredientId, body: {'stock_quantity-': entry.value});
+      } on ClientException catch (e) {
+        if (e.statusCode == 404) {
+          throw Exception(
+            'PocketBase 404 khi trừ kho (ingredients:update $ingredientId).\n'
+            'Nguyên nhân thường gặp: nguyên liệu không tồn tại hoặc user hiện tại không có quyền update collection ingredients (rules).',
+          );
+        }
+        rethrow;
+      }
     }
 
     // 4. Tự động cập nhật trạng thái món ăn
     final changedIds = totalNeededMap.keys.toList();
-    await checkAndUpdateMenuAvailability(changedIds);
+    // Best-effort: menu availability update may be restricted by rules.
+    try {
+      await checkAndUpdateMenuAvailability(changedIds);
+    } catch (e) {
+      print('Warning: checkAndUpdateMenuAvailability failed (ignored): $e');
+    }
 
     print('Trừ kho hoàn tất.');
   }
@@ -273,10 +418,21 @@ class InventoryService {
         }
 
         // Cập nhật in_stock
-        await pb
-            .collection('menu_items')
-            .update(menuItemId, body: {'in_stock': isEnough});
-        print('Updated menu item $menuItemId in_stock = $isEnough');
+        try {
+          await pb
+              .collection('menu_items')
+              .update(menuItemId, body: {'in_stock': isEnough});
+          print('Updated menu item $menuItemId in_stock = $isEnough');
+        } on ClientException catch (e) {
+          if (e.statusCode == 404) {
+            print(
+              'PocketBase 404 khi cập nhật in_stock (menu_items:update $menuItemId). '
+              'Có thể do rules không cho phép user hiện tại update menu_items.',
+            );
+          } else {
+            print('Error updating menu item $menuItemId in_stock: $e');
+          }
+        }
       } catch (e) {
         print('Error checking stock for menu item $menuItemId: $e');
       }

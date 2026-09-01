@@ -58,9 +58,9 @@ class AppNotification {
 
 class NotificationProvider extends ChangeNotifier {
   // State variables
-  List<AppNotification> _notifications = [];
-  List<AppNotification> _displayQueue = [];
-  Map<NotificationType, bool> _typeSettings = {
+  final List<AppNotification> _notifications = [];
+  final List<AppNotification> _displayQueue = [];
+  final Map<NotificationType, bool> _typeSettings = {
     NotificationType.order: true,
     NotificationType.staff: true,
     NotificationType.inventory: true,
@@ -75,7 +75,7 @@ class NotificationProvider extends ChangeNotifier {
   String _quietHoursStart = '22:00';
   String _quietHoursEnd = '06:00';
 
-  int _maxNotificationsStored = 100;
+  final int _maxNotificationsStored = 100;
 
   // Getters
   List<AppNotification> get notifications => _notifications;
@@ -153,7 +153,7 @@ class NotificationProvider extends ChangeNotifier {
 
     debugPrint('Notification added: ${notification.title}');
     debugPrint(
-      'Total notifications: ${_notifications.length}, Unread: ${unreadCount}',
+      'Total notifications: ${_notifications.length}, Unread: $unreadCount',
     );
     notifyListeners();
     debugPrint('notifyListeners() called');

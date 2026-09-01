@@ -46,7 +46,7 @@ class _CompletedOrderDetailScreenState
           children: [
             // --- PHẦN ĐÃ SỬA ---
             Text(
-              'Hóa đơn ${widget.orderView.tableName}', // Chỉ hiển thị tên bàn
+              'Hóa đơn ${widget.orderView.displayTableName}',
               style: Theme.of(
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -66,6 +66,7 @@ class _CompletedOrderDetailScreenState
               ).format(widget.orderView.created),
             ),
             _buildInfoRow('Người tạo:', widget.orderView.createdByUsername),
+            _buildInfoRow('Số bàn:', widget.orderView.displayTableName),
             const SizedBox(height: 8),
             _buildInfoRow(
               'Tổng tiền:',
@@ -89,19 +90,30 @@ class _CompletedOrderDetailScreenState
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-              fontSize: isTotal ? 18 : 14,
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+                fontSize: isTotal ? 18 : 14,
+              ),
             ),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.w600,
-              fontSize: isTotal ? 18 : 14,
-              color: color ?? (isTotal ? Colors.red.shade700 : Colors.black87),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: isTotal ? FontWeight.bold : FontWeight.w600,
+                fontSize: isTotal ? 18 : 14,
+                color:
+                    color ?? (isTotal ? Colors.red.shade700 : Colors.black87),
+              ),
             ),
           ),
         ],

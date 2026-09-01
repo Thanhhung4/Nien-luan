@@ -8,6 +8,23 @@ class NotificationService {
 
   NotificationService(this.pb);
 
+  String _formatPbError(Object error) {
+    if (error is ClientException) {
+      final status = error.statusCode;
+      final message = (error.response['message'] ?? '').toString();
+      final data = error.response['data'];
+
+      if (message.isNotEmpty && data != null) {
+        return 'PocketBase $status: $message | data: $data';
+      }
+      if (message.isNotEmpty) {
+        return 'PocketBase $status: $message';
+      }
+      return 'PocketBase $status: $error';
+    }
+    return error.toString();
+  }
+
   // Lấy danh sách
   Future<List<NotificationModel>> getNotifications() async {
     try {
@@ -17,7 +34,7 @@ class NotificationService {
       return records.map((r) => NotificationModel.fromRecord(r)).toList();
     } catch (e) {
       print('Error fetching notifications: $e');
-      throw Exception('Failed to load notifications: $e');
+      throw Exception('Failed to load notifications: ${_formatPbError(e)}');
     }
   }
 
@@ -33,10 +50,12 @@ class NotificationService {
             body: {
               'title': title,
               'content': content, // Dùng content
+              // PocketBase schema thường có cờ đọc/chưa đọc; gửi mặc định để tránh lỗi field bắt buộc.
+              'isRead': false,
             },
           );
     } catch (e) {
-      throw Exception('Failed to create notification: $e');
+      throw Exception('Failed to create notification: ${_formatPbError(e)}');
     }
   }
 
@@ -57,7 +76,7 @@ class NotificationService {
             },
           );
     } catch (e) {
-      throw Exception('Failed to update notification: $e');
+      throw Exception('Failed to update notification: ${_formatPbError(e)}');
     }
   }
 
@@ -66,7 +85,7 @@ class NotificationService {
     try {
       await pb.collection('notifications').delete(id);
     } catch (e) {
-      throw Exception('Failed to delete notification: $e');
+      throw Exception('Failed to delete notification: ${_formatPbError(e)}');
     }
   }
 
@@ -75,7 +94,7 @@ class NotificationService {
     try {
       await pb.collection('notifications').update(id, body: {'isRead': true});
     } catch (e) {
-      throw Exception('Failed to mark notification as read: $e');
+      throw Exception('Failed to mark notification as read: ${_formatPbError(e)}');
     }
   }
 }

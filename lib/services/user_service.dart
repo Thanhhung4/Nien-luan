@@ -213,7 +213,7 @@ class UserService {
           // Generic field error
           final firstErrorKey = errors.keys.first;
           final firstError = errors[firstErrorKey];
-          throw Exception('Lỗi ${firstErrorKey}: ${firstError.toString()}');
+          throw Exception('Lỗi $firstErrorKey: ${firstError.toString()}');
         }
 
         // Generic PocketBase error

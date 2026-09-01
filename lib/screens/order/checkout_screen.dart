@@ -9,6 +9,7 @@ class CheckoutScreen extends StatelessWidget {
   final OrderModel order;
   final List<OrderItemView> items;
   final double totalPrice;
+  final String? tableName;
   final String restaurantAddress =
       "125/2 Hòa Hưng, Quận 10, Thành phố Hồ Chí Minh";
   final String vietqrAccount = "1026325913";
@@ -19,7 +20,20 @@ class CheckoutScreen extends StatelessWidget {
     required this.order,
     required this.items,
     required this.totalPrice,
+    this.tableName,
   });
+
+  String _displayTableName(String? raw) {
+    final name = (raw ?? '').trim();
+    if (name.isEmpty) return 'Tại quán';
+
+    final lower = name.toLowerCase();
+    if (lower.contains('tại quán') || lower.contains('tai quan')) {
+      return 'Tại quán';
+    }
+    if (lower.contains('bàn') || lower.contains('ban ')) return name;
+    return 'Bàn $name';
+  }
 
   // Tạo chuỗi VietQR
   String get qrData {
@@ -54,6 +68,7 @@ class CheckoutScreen extends StatelessWidget {
               'Ngày giờ:',
               DateFormat('HH:mm dd/MM/yyyy').format(order.created),
             ),
+            _buildInfoRow('Số bàn:', _displayTableName(tableName)),
             const Divider(height: 24),
 
             // Danh sách món ăn
@@ -126,7 +141,7 @@ class CheckoutScreen extends StatelessWidget {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                child: const Text('Xác nhận Đã Thanh toán'),
+                child: const Text('Xác nhận thanh toán'),
                 onPressed: () {
                   Navigator.of(
                     context,
@@ -146,8 +161,19 @@ class CheckoutScreen extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
+          Expanded(
+            child: Text(label, style: const TextStyle(color: Colors.grey)),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
         ],
       ),
     );

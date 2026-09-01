@@ -370,7 +370,7 @@ class _AddExceptionDialogState extends State<AddExceptionDialog> {
             children: [
               // 1. Loại ngoại lệ
               DropdownButtonFormField<ScheduleExceptionType>(
-                value: _selectedType,
+                initialValue: _selectedType,
                 decoration: const InputDecoration(
                   labelText: 'Loại ngoại lệ',
                   border: OutlineInputBorder(),

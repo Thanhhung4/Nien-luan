@@ -10,6 +10,23 @@ class MenuService {
 
   MenuService(this.pb);
 
+  String _formatPbError(Object error) {
+    if (error is ClientException) {
+      final status = error.statusCode;
+      final message = (error.response['message'] ?? '').toString();
+      final data = error.response['data'];
+
+      if (message.isNotEmpty && data != null) {
+        return 'PocketBase $status: $message | data: $data';
+      }
+      if (message.isNotEmpty) {
+        return 'PocketBase $status: $message';
+      }
+      return 'PocketBase $status: $error';
+    }
+    return error.toString();
+  }
+
   /// 1. LẤY (READ) TẤT CẢ
   Future<List<MenuItemModel>> getMenu() async {
     try {
@@ -21,7 +38,7 @@ class MenuService {
           .toList();
     } catch (e) {
       print('MenuService - getMenu Error: $e');
-      throw Exception('Failed to load menu: $e');
+      throw Exception('Failed to load menu: ${_formatPbError(e)}');
     }
   }
 
@@ -33,7 +50,7 @@ class MenuService {
       return MenuItemModel.fromRecord(record, pb);
     } catch (e) {
       print('MenuService - getMenuItem Error: $e');
-      throw Exception('Failed to load menu item: $e');
+      throw Exception('Failed to load menu item: ${_formatPbError(e)}');
     }
   }
 
@@ -73,7 +90,7 @@ class MenuService {
           );
     } catch (e) {
       print('MenuService - createMenuItem Error: $e');
-      throw Exception('Failed to create menu item: $e');
+      throw Exception('Failed to create menu item: ${_formatPbError(e)}');
     }
   }
 
@@ -120,7 +137,7 @@ class MenuService {
           );
     } catch (e) {
       print('MenuService - updateMenuItem Error: $e');
-      throw Exception('Failed to update menu item: $e');
+      throw Exception('Failed to update menu item: ${_formatPbError(e)}');
     }
   }
 
@@ -130,7 +147,7 @@ class MenuService {
       await pb.collection('menu_items').delete(id);
     } catch (e) {
       print('MenuService - deleteMenuItem Error: $e');
-      throw Exception('Failed to delete menu item: $e');
+      throw Exception('Failed to delete menu item: ${_formatPbError(e)}');
     }
   }
 }

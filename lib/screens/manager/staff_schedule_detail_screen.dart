@@ -83,7 +83,7 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
       _loadExceptions();
     } catch (e) {
       if (mounted) _showSnackbar('Lỗi: $e', Colors.red);
-      throw e;
+      rethrow;
     }
   }
 
@@ -165,10 +165,11 @@ class _StaffScheduleDetailScreenState extends State<StaffScheduleDetailScreen>
       } catch (e) {
         if (mounted) _showSnackbar('Lỗi lưu lịch: $e', Colors.red);
       } finally {
-        if (mounted)
+        if (mounted) {
           setState(() {
             _isSavingSchedule = false;
           });
+        }
       }
     }
   }

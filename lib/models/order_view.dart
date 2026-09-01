@@ -12,6 +12,23 @@ class OrderViewModel {
   final DateTime created;
   final DateTime updated;
 
+  String get displayTableName {
+    final name = tableName.trim();
+    if (name.isEmpty) return 'Tại quán';
+
+    final lower = name.toLowerCase();
+    if (lower.contains('tại quán') || lower.contains('tai quan')) {
+      return 'Tại quán';
+    }
+
+    if (lower.contains('bàn') || lower.contains('ban ')) {
+      return name;
+    }
+
+    // If it's just a number or any other label, prefix with "Bàn "
+    return 'Bàn $name';
+  }
+
   OrderViewModel({
     required this.id,
     required this.tableId,
@@ -26,16 +43,84 @@ class OrderViewModel {
   factory OrderViewModel.fromRecord(
     RecordModel record,
     RecordModel? tableRecord,
-    RecordModel? creatorRecord, // Nhận thêm RecordModel của người tạo
-  ) {
+    RecordModel? creatorRecord, { // Nhận thêm RecordModel của người tạo
+    String? tableNameFallback,
+  }) {
     // CẬP NHẬT: Thay thế 'username' bằng 'name' theo yêu cầu (Giả định trường 'name' có trong collection 'users')
     // Nếu trường 'name' không tồn tại, nó sẽ là null.
     final creatorName = creatorRecord?.getStringValue('name');
 
+    String rawTableValue = record.getStringValue('table').trim();
+    if (rawTableValue.isEmpty) {
+      try {
+        final tableList = record.get<List<String>?>('table');
+        if (tableList != null && tableList.isNotEmpty) {
+          rawTableValue = tableList.first.trim();
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    if (rawTableValue.isEmpty) {
+      try {
+        final tableList = record.get<List<dynamic>?>('table');
+        if (tableList != null && tableList.isNotEmpty) {
+          rawTableValue = tableList.first.toString().trim();
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    if (rawTableValue.isEmpty) {
+      try {
+        final tableMap = record.get<Map<String, dynamic>?>('table');
+        if (tableMap != null) {
+          rawTableValue =
+              (tableMap['id'] ?? tableMap['recordId'] ?? tableMap['name'] ?? '')
+                  .toString()
+                  .trim();
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    if (rawTableValue.isEmpty) {
+      try {
+        final any = record.get<dynamic>('table');
+        if (any is String && any.trim().isNotEmpty) {
+          rawTableValue = any.trim();
+        } else if (any is List && any.isNotEmpty) {
+          rawTableValue = any.first.toString().trim();
+        } else if (any is Map && any['id'] != null) {
+          rawTableValue = any['id'].toString().trim();
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    bool looksLikePocketBaseId(String value) {
+      // PocketBase default record id is typically a 15-char base62-like string.
+      // If `orders.table` is plain text (e.g. "Bàn 1"), treat it as a name.
+      return RegExp(r'^[a-z0-9]{15}$', caseSensitive: false).hasMatch(value);
+    }
+
+    final rawTableName =
+        (rawTableValue.isNotEmpty && !looksLikePocketBaseId(rawTableValue))
+        ? rawTableValue
+        : '';
+
+    final normalizedFallback = (tableNameFallback ?? '').trim();
+
     return OrderViewModel(
       id: record.id,
-      tableId: record.getStringValue('table'),
-      tableName: tableRecord?.getStringValue('name') ?? 'Tại quán',
+      tableId: rawTableValue,
+      tableName:
+          tableRecord?.getStringValue('name') ??
+          (normalizedFallback.isNotEmpty ? normalizedFallback : rawTableName),
       totalPrice: record.getDoubleValue('total_price'),
       createdById: record.getStringValue('created_by'),
 

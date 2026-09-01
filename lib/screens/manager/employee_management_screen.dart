@@ -71,7 +71,7 @@ class _EmployeeManagementScreenState extends State<EmployeeManagementScreen> {
       _loadStaffProfiles();
     } catch (e) {
       _showSnackbar('Lỗi thêm nhân viên: $e', Colors.red);
-      throw e;
+      rethrow;
     }
   }
 
@@ -154,7 +154,7 @@ class _EmployeeManagementScreenState extends State<EmployeeManagementScreen> {
       _loadStaffProfiles();
     } catch (e) {
       _showSnackbar('Lỗi cập nhật: $e', Colors.red);
-      throw e;
+      rethrow;
     }
   }
 

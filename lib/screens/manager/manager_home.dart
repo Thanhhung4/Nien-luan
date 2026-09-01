@@ -9,6 +9,7 @@ import 'package:myshop/screens/manager/notification_management_screen.dart';
 import 'package:myshop/screens/manager/reports.dart';
 import 'package:myshop/screens/order/completed_orders_screen.dart';
 import 'package:myshop/screens/manager/inventory_management_screen.dart';
+import 'package:myshop/screens/manager/table_management_screen.dart';
 
 class ManagerHome extends StatelessWidget {
   const ManagerHome({super.key});
@@ -53,6 +54,19 @@ class ManagerHome extends StatelessWidget {
         crossAxisSpacing: spacing,
         mainAxisSpacing: spacing,
         children: [
+          _buildDashboardButton(
+            context,
+            icon: Icons.table_restaurant,
+            label: 'Quản lý Bàn',
+            color: Colors.teal,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const TableManagementScreen(),
+                ),
+              );
+            },
+          ),
           _buildDashboardButton(
             context,
             icon: Icons.assignment,

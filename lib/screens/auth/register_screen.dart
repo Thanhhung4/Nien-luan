@@ -1,29 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../services/pocketbase_service.dart';
-import '../../providers/auth_provider.dart';
-import '../employee/employee_home.dart';
-import '../manager/manager_home.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+import 'package:myshop/models/staff_role.dart';
+import 'package:myshop/providers/auth_provider.dart';
+import 'package:myshop/screens/employee/employee_home.dart';
+import 'package:myshop/screens/manager/manager_home.dart';
+import 'package:myshop/services/pocketbase_service.dart';
+
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _RegisterScreenState extends State<RegisterScreen> {
+  final nameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
-  final pbService = PocketBaseService.instance;
-  bool isLoading = false;
+  final passwordConfirmController = TextEditingController();
 
   static const _backgroundAssetPath = 'assets/images/login_bg.png';
 
+  final PocketBaseService pbService = PocketBaseService.instance;
+  bool isLoading = false;
+
   @override
   void dispose() {
+    nameController.dispose();
     emailController.dispose();
     passwordController.dispose();
+    passwordConfirmController.dispose();
     super.dispose();
   }
 
@@ -44,45 +51,60 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Future<void> _handleLogin() async {
-    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
-      _showSnackbar('Vui lòng nhập đầy đủ Email và Mật khẩu.', isError: true);
+  Future<void> _handleRegister() async {
+    final name = nameController.text.trim();
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+    final passwordConfirm = passwordConfirmController.text;
+
+    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+      _showSnackbar(
+        'Vui lòng nhập đầy đủ Họ tên, Email và Mật khẩu.',
+        isError: true,
+      );
       return;
     }
 
-    // 1. Bắt đầu loading
+    if (password != passwordConfirm) {
+      _showSnackbar('Mật khẩu xác nhận không khớp.', isError: true);
+      return;
+    }
+
     setState(() => isLoading = true);
 
     try {
-      // 2. Thử đăng nhập thông qua AuthProvider
-      final authProvider = context.read<AuthProvider>();
-      final success = await authProvider.login(
-        emailController.text,
-        passwordController.text,
+      // Tạo tài khoản + hồ sơ nhân viên (liên kết với user_account)
+      await pbService.users.addStaffProfile(
+        name: name,
+        role: StaffRole.employee,
+        email: email,
+        password: password,
       );
 
-      if (success && authProvider.userRole != null) {
-        final userRole = authProvider.userRole!;
+      // Đăng nhập ngay sau khi đăng ký
+      final authProvider = context.read<AuthProvider>();
+      final success = await authProvider.login(email, password);
 
-        // 3. Điều hướng theo role
-        switch (userRole) {
-          case 'employee':
-            _navigateTo(const EmployeeHome());
-            break;
-          case 'manager':
-            _navigateTo(const ManagerHome());
-            break;
-          default:
-            _showSnackbar('Vai trò người dùng không hợp lệ.', isError: true);
-        }
-      } else {
+      if (!success || authProvider.userRole == null) {
         _showSnackbar(
-          'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.',
+          'Đăng ký thành công nhưng đăng nhập thất bại.',
           isError: true,
         );
+        return;
+      }
+
+      switch (authProvider.userRole) {
+        case 'employee':
+          _navigateTo(const EmployeeHome());
+          break;
+        case 'manager':
+          _navigateTo(const ManagerHome());
+          break;
+        default:
+          _showSnackbar('Vai trò người dùng không hợp lệ.', isError: true);
       }
     } catch (e) {
-      _showSnackbar('Lỗi đăng nhập: $e', isError: true);
+      _showSnackbar('Lỗi đăng ký: $e', isError: true);
     } finally {
       if (mounted) {
         setState(() => isLoading = false);
@@ -94,7 +116,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Login"),
+        title: const Text('Đăng ký'),
         backgroundColor: Theme.of(context).primaryColor,
       ),
       body: Stack(
@@ -104,7 +126,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           Positioned.fill(
             child: Align(
-              alignment: const Alignment(0, -0.15),
+              alignment: const Alignment(0, -0.1),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24.0),
                 child: ConstrainedBox(
@@ -119,31 +141,45 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Email Input
+                          TextField(
+                            controller: nameController,
+                            decoration: const InputDecoration(
+                              labelText: 'Họ tên',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.person),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
                           TextField(
                             controller: emailController,
                             keyboardType: TextInputType.emailAddress,
                             decoration: const InputDecoration(
-                              labelText: "Email",
+                              labelText: 'Email',
                               border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.email),
                             ),
                           ),
                           const SizedBox(height: 16),
-
-                          // Password Input
                           TextField(
                             controller: passwordController,
+                            obscureText: true,
                             decoration: const InputDecoration(
-                              labelText: "Password",
+                              labelText: 'Mật khẩu',
                               border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.lock),
                             ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: passwordConfirmController,
                             obscureText: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Xác nhận mật khẩu',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.lock_outline),
+                            ),
                           ),
                           const SizedBox(height: 32),
-
-                          // Login Button / Loading Indicator
                           SizedBox(
                             width: double.infinity,
                             child: isLoading
@@ -151,7 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     child: CircularProgressIndicator(),
                                   )
                                 : ElevatedButton(
-                                    onPressed: _handleLogin,
+                                    onPressed: _handleRegister,
                                     style: ElevatedButton.styleFrom(
                                       padding: const EdgeInsets.symmetric(
                                         vertical: 15,
@@ -161,33 +197,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ),
                                     ),
                                     child: const Text(
-                                      "Đăng nhập",
+                                      'Tạo tài khoản',
                                       style: TextStyle(fontSize: 18),
                                     ),
                                   ),
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          Wrap(
-                            alignment: WrapAlignment.center,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 4,
-                            children: [
-                              const Text(
-                                'Bạn chưa có tài khoản?',
-                                textAlign: TextAlign.center,
-                              ),
-                              TextButton(
-                                onPressed: isLoading
-                                    ? null
-                                    : () => Navigator.pushNamed(
-                                        context,
-                                        '/register',
-                                      ),
-                                child: const Text('Đăng ký ngay'),
-                              ),
-                            ],
                           ),
                         ],
                       ),

@@ -438,10 +438,11 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
     final activeBatches = <IngredientBatch>[];
     final expiredBatches = <IngredientBatch>[];
     for (var b in batches) {
-      if (b.isExpired)
+      if (b.isExpired) {
         expiredBatches.add(b);
-      else
+      } else {
         activeBatches.add(b);
+      }
     }
     activeBatches.sort((a, b) => a.expiryDate.compareTo(b.expiryDate));
     expiredBatches.sort((a, b) => b.expiryDate.compareTo(a.expiryDate));
@@ -520,7 +521,7 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
     Ingredient ing, {
     required bool isExpiredList,
   }) {
-    if (batchList.isEmpty)
+    if (batchList.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -540,6 +541,7 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
           ],
         ),
       );
+    }
 
     return ListView.builder(
       padding: const EdgeInsets.all(8),
@@ -831,13 +833,14 @@ class _InventoryManagementScreenState extends State<InventoryManagementScreen> {
                       _loadIngredients();
                     }
                   } catch (e) {
-                    if (mounted)
+                    if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('Lỗi: $e'),
                           backgroundColor: Colors.red,
                         ),
                       );
+                    }
                   }
                 }
               },
@@ -879,11 +882,45 @@ class _IngredientFormDialogState extends State<_IngredientFormDialog> {
   late TextEditingController _nameController;
   late TextEditingController _costController;
   String? _selectedUnit;
+
+  String? _coerceIngredientUnit(String? rawUnit) {
+    if (rawUnit == null) return null;
+
+    final cleaned = rawUnit.trim().replaceAll(RegExp(r'\.+$'), '');
+    if (cleaned.isEmpty) return null;
+
+    for (final unit in INGREDIENT_UNITS) {
+      if (unit.toLowerCase() == cleaned.toLowerCase()) {
+        return unit; // canonical value from constants
+      }
+    }
+
+    // Keep unknown values (from DB) to avoid DropdownButton assertion crash.
+    return cleaned;
+  }
+
+  List<String> _buildIngredientUnitOptions(String? currentUnit) {
+    final options = <String>[];
+    final coerced = _coerceIngredientUnit(currentUnit);
+
+    if (coerced != null && coerced.isNotEmpty) {
+      options.add(coerced);
+    }
+
+    for (final unit in INGREDIENT_UNITS) {
+      if (!options.contains(unit)) {
+        options.add(unit);
+      }
+    }
+
+    return options;
+  }
+
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.ingredient?.name);
-    _selectedUnit = widget.ingredient?.unit;
+    _selectedUnit = _coerceIngredientUnit(widget.ingredient?.unit);
     _costController = TextEditingController(
       text: widget.ingredient?.costPerUnit.toString() ?? '0',
     );
@@ -901,7 +938,7 @@ class _IngredientFormDialogState extends State<_IngredientFormDialog> {
     setState(() => _isLoading = true);
     try {
       final name = _nameController.text;
-      final unit = _selectedUnit ?? '';
+      final unit = _coerceIngredientUnit(_selectedUnit) ?? '';
       final cost = double.tryParse(_costController.text) ?? 0.0;
       if (widget.ingredient == null) {
         await pbService.inventory.createIngredient(
@@ -922,10 +959,11 @@ class _IngredientFormDialogState extends State<_IngredientFormDialog> {
       widget.onSave();
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
         );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -933,6 +971,14 @@ class _IngredientFormDialogState extends State<_IngredientFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final unitOptions = _buildIngredientUnitOptions(_selectedUnit);
+    final coercedUnit = _coerceIngredientUnit(_selectedUnit);
+    final safeSelectedUnit =
+        (coercedUnit != null &&
+            unitOptions.where((u) => u == coercedUnit).length == 1)
+        ? coercedUnit
+        : null;
+
     return AlertDialog(
       title: Text(
         widget.ingredient != null ? 'Sửa Thông tin' : 'Thêm Nguyên vật liệu',
@@ -950,12 +996,12 @@ class _IngredientFormDialogState extends State<_IngredientFormDialog> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _selectedUnit,
+                initialValue: safeSelectedUnit,
                 decoration: const InputDecoration(
                   labelText: 'Đơn vị',
                   border: OutlineInputBorder(),
                 ),
-                items: INGREDIENT_UNITS
+                items: unitOptions
                     .map(
                       (unit) =>
                           DropdownMenuItem(value: unit, child: Text(unit)),

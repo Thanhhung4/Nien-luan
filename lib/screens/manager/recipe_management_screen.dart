@@ -475,7 +475,7 @@ class _IngredientDialogState extends State<_IngredientDialog> {
           children: [
             if (widget.allIngredients != null)
               DropdownButtonFormField<Ingredient>(
-                value: _selectedIngredient,
+                initialValue: _selectedIngredient,
                 decoration: const InputDecoration(
                   labelText: 'Chọn Nguyên liệu',
                 ),

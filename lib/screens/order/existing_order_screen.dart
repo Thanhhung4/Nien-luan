@@ -89,6 +89,7 @@ class _ExistingOrderScreenState extends State<ExistingOrderScreen> {
           order: _order!,
           items: _items,
           totalPrice: _totalPrice,
+          tableName: widget.table.name,
         ),
       ),
     );
@@ -130,7 +131,7 @@ class _ExistingOrderScreenState extends State<ExistingOrderScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Chi tiết Bàn ${widget.table.name}"),
+        title: Text('Chi tiết ${widget.table.name}'),
         backgroundColor: Colors.red.shade400,
         foregroundColor: Colors.white,
       ),
@@ -189,15 +190,22 @@ class _ExistingOrderScreenState extends State<ExistingOrderScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Các món đã gọi (${_items.length})',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Text(
+                        'Các món đã gọi (${_items.length})',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 12),
                     Text(
                       formatCurrency(_totalPrice),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,

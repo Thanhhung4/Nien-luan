@@ -3,7 +3,6 @@ import 'package:myshop/models/cart_item.dart';
 import 'package:myshop/utils/currency_formatter.dart';
 import 'package:myshop/services/pocketbase_service.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter/services.dart';
 
 class PaymentScreen extends StatefulWidget {
   final List<CartItem> cartItems;
@@ -55,6 +54,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
           notes: cartItem.notes,
         );
       }
+
+      // Trừ kho nguyên liệu sau khi thanh toán
+      final itemsInOrder = await pbService.getOrderItemsWithDetails(orderId);
+      await pbService.inventory.deductStockForOrder(itemsInOrder);
 
       if (!mounted) return;
 
@@ -313,7 +316,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         ),
                       ),
                       child: const Text(
-                        'Xác nhận đã thanh toán',
+                        'Xác nhận thanh toán',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,

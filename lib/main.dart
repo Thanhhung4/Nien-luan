@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'routes/app_routes.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/register_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'providers/auth_provider.dart';
@@ -15,7 +16,11 @@ import 'providers/notification_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env"); // load biến môi trường POCKETBASE_URL
+  try {
+    await dotenv.load(fileName: ".env"); // load biến môi trường POCKETBASE_URL
+  } catch (_) {
+    // Ignore when .env is missing (fallback URL is used).
+  }
   // --- THÊM DÒNG NÀY ĐỂ KHỞI TẠO TIẾNG VIỆT ---
   await initializeDateFormatting('vi_VN', null);
   runApp(const MyApp());
@@ -66,6 +71,7 @@ class MyApp extends StatelessWidget {
         initialRoute: '/login',
         routes: {
           '/login': (context) => const LoginScreen(),
+          '/register': (context) => const RegisterScreen(),
           ...AppRoutes.routes, // các route employeeHome, managerHome
         },
       ),

@@ -55,7 +55,7 @@ class _NotificationManagementScreenState
           SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
         );
       }
-      throw e;
+      rethrow;
     }
   }
 
@@ -82,7 +82,7 @@ class _NotificationManagementScreenState
           SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
         );
       }
-      throw e;
+      rethrow;
     }
   }
 

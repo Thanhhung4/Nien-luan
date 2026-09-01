@@ -98,7 +98,7 @@ class _AddEmployeeDialogState extends State<AddEmployeeDialog> {
 
               // 2. Chọn Vai trò (Đưa lên trên để điều khiển hiển thị Email/Pass)
               DropdownButtonFormField<StaffRole>(
-                value: _selectedRole,
+                initialValue: _selectedRole,
                 decoration: const InputDecoration(
                   labelText: 'Vai trò / Chức vụ',
                   border: OutlineInputBorder(),

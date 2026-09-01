@@ -301,16 +301,27 @@ class _ReportsScreenState extends State<ReportsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildSummaryItem(
-                  'Doanh thu',
-                  formatCurrency(revenue),
-                  small: true,
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: _buildSummaryItem(
+                      'Doanh thu',
+                      formatCurrency(revenue),
+                      small: true,
+                    ),
+                  ),
                 ),
-                _buildSummaryItem(
-                  'Lãi gộp',
-                  formatCurrency(grossProfit),
-                  small: true,
-                  isHighlight: true,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: _buildSummaryItem(
+                      'Lãi gộp',
+                      formatCurrency(grossProfit),
+                      small: true,
+                      isHighlight: true,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -325,16 +336,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Text(
-                  spoilageCost > 0
-                      ? "-${formatCurrency(spoilageCost)}"
-                      : "Không có",
-                  style: TextStyle(
-                    color: spoilageCost > 0
-                        ? Colors.redAccent.shade100
-                        : Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Text(
+                    spoilageCost > 0
+                        ? "-${formatCurrency(spoilageCost)}"
+                        : "Không có",
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: spoilageCost > 0
+                          ? Colors.redAccent.shade100
+                          : Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
               ],
@@ -377,8 +394,27 @@ class _ReportsScreenState extends State<ReportsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildSummaryItem('Tổng Đơn', '$totalOrders', small: true),
-                _buildSummaryItem('Đông nhất', busiestDay, small: true),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: _buildSummaryItem(
+                      'Tổng Đơn',
+                      '$totalOrders',
+                      small: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: _buildSummaryItem(
+                      'Đông nhất',
+                      busiestDay,
+                      small: true,
+                    ),
+                  ),
+                ),
               ],
             ),
           ],
@@ -401,12 +437,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
             icon: const Icon(Icons.chevron_left),
             onPressed: () => _changeMonth(-1),
           ),
-          Text(
-            "Tháng ${DateFormat('MM/yyyy').format(_selectedMonth)}",
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.amber,
+          Flexible(
+            child: Text(
+              "Tháng ${DateFormat('MM/yyyy').format(_selectedMonth)}",
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.amber,
+              ),
             ),
           ),
           IconButton(
@@ -436,8 +477,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _buildSummaryItem('Tổng Lương', formatCurrency(totalPayroll)),
-            _buildSummaryItem('Nhân viên', '$activeStaff'),
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: _buildSummaryItem(
+                  'Tổng Lương',
+                  formatCurrency(totalPayroll),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: _buildSummaryItem('Nhân viên', '$activeStaff'),
+              ),
+            ),
             // Đã xóa Icon(Icons.chevron_right)
           ],
         ),
@@ -485,11 +540,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Widget _buildBarChart(List<DailyRevenue> data) {
-    if (data.isEmpty)
+    if (data.isEmpty) {
       return const SizedBox(
         height: 200,
         child: Center(child: Text('Không có dữ liệu')),
       );
+    }
 
     double maxY =
         data.map((e) => e.total).fold(0.0, (p, c) => c > p ? c : p) * 1.2;
@@ -537,11 +593,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 showTitles: true,
                 reservedSize: 45,
                 getTitlesWidget: (v, m) {
-                  if (v == 0 || v == maxY)
+                  if (v == 0 || v == maxY) {
                     return Text(
                       _formatShortCurrency(v),
                       style: const TextStyle(fontSize: 10),
                     );
+                  }
                   return const Text('');
                 },
               ),
@@ -604,6 +661,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
         Text(
           label,
           style: TextStyle(color: Colors.white70, fontSize: small ? 14 : 16),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         Text(
           value,
@@ -612,6 +671,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
             fontWeight: FontWeight.bold,
             fontSize: small ? 20 : 24,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );

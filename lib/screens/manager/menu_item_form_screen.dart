@@ -24,6 +24,21 @@ class _MenuItemFormScreenState extends State<MenuItemFormScreen> {
   final pbService = PocketBaseService.instance;
   bool _isLoading = false;
 
+  String? _coerceMenuUnit(String? rawUnit) {
+    if (rawUnit == null) return null;
+
+    // Normalize common dirty values coming from DB (e.g. "phần.")
+    final cleaned = rawUnit.trim().replaceAll(RegExp(r'\.+$'), '');
+    if (cleaned.isEmpty) return null;
+
+    for (final unit in MENU_ITEM_UNITS) {
+      if (unit.toLowerCase() == cleaned.toLowerCase()) {
+        return unit; // Return canonical value from constants
+      }
+    }
+    return null;
+  }
+
   // Controllers
   late TextEditingController _nameController;
   late TextEditingController
@@ -55,7 +70,7 @@ class _MenuItemFormScreenState extends State<MenuItemFormScreen> {
     );
     _descriptionController = TextEditingController(text: item?.description);
 
-    _selectedUnit = item?.unit;
+    _selectedUnit = _coerceMenuUnit(item?.unit);
 
     _currentPrice = item?.price ?? 0.0;
     _currentCost = item?.cost ?? 0.0;
@@ -94,7 +109,7 @@ class _MenuItemFormScreenState extends State<MenuItemFormScreen> {
     try {
       final name = _nameController.text;
       final price = _currentPrice; // Lấy từ state
-      final unit = _selectedUnit ?? '';
+      final unit = _coerceMenuUnit(_selectedUnit) ?? '';
       final description = _descriptionController.text;
       final cost = _currentCost; // Lấy từ state
       final category = _selectedCategory == MenuItemCategory.food
@@ -134,7 +149,7 @@ class _MenuItemFormScreenState extends State<MenuItemFormScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Đã lưu món "${name}" thành công!'),
+          content: Text('Đã lưu món "$name" thành công!'),
           backgroundColor: Colors.green,
         ),
       );
@@ -226,6 +241,16 @@ class _MenuItemFormScreenState extends State<MenuItemFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Always feed DropdownButton with a value that matches exactly one item.
+    // This prevents the common runtime crash when existing DB values are dirty
+    // (e.g. "phần.") or when the units list changes.
+    final coercedUnit = _coerceMenuUnit(_selectedUnit);
+    final safeSelectedUnit =
+        (coercedUnit != null &&
+            MENU_ITEM_UNITS.where((u) => u == coercedUnit).length == 1)
+        ? coercedUnit
+        : null;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditing ? 'Sửa Món' : 'Thêm Món Mới'),
@@ -282,7 +307,7 @@ class _MenuItemFormScreenState extends State<MenuItemFormScreen> {
 
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedUnit,
+              initialValue: safeSelectedUnit,
               decoration: const InputDecoration(
                 labelText: 'Đơn vị',
                 border: OutlineInputBorder(),
@@ -306,7 +331,7 @@ class _MenuItemFormScreenState extends State<MenuItemFormScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<MenuItemCategory>(
-              value: _selectedCategory,
+              initialValue: _selectedCategory,
               decoration: const InputDecoration(
                 labelText: 'Phân loại',
                 border: OutlineInputBorder(),

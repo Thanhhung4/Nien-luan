@@ -158,21 +158,32 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           for (var view in existingItemViews) view.menuItem.id: view,
         };
 
-        List<Future> updateFutures = [];
+        // 1) Xóa món đã có trong DB nhưng người dùng bỏ khỏi giỏ
+        for (final existing in existingItemViews) {
+          if (!_cart.containsKey(existing.menuItem.id)) {
+            await pbService.deleteOrderItemRecord(existing.id);
+          }
+        }
+
+        // 2) Update tăng/giảm số lượng + ghi chú, và tạo món mới nếu chưa có
         for (final cartItem in _cart.values) {
-          if (!existingItemsMap.containsKey(cartItem.item.id)) {
-            updateFutures.add(
-              pbService.createOrderItemRecord(
-                orderId: orderId,
-                menuItemId: cartItem.item.id,
-                quantity: cartItem.quantity,
-                price: cartItem.item.price,
-                notes: cartItem.notes,
-              ),
+          final existing = existingItemsMap[cartItem.item.id];
+          if (existing == null) {
+            await pbService.createOrderItemRecord(
+              orderId: orderId,
+              menuItemId: cartItem.item.id,
+              quantity: cartItem.quantity,
+              price: cartItem.item.price,
+              notes: cartItem.notes,
+            );
+          } else {
+            await pbService.updateOrderItemRecord(
+              orderItemId: existing.id,
+              quantity: cartItem.quantity,
+              notes: cartItem.notes,
             );
           }
         }
-        await Future.wait(updateFutures);
 
         final allItems = await pbService.getOrderItemsWithDetails(orderId);
         final newTotal = allItems.fold<double>(
@@ -272,7 +283,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(appBarTitle),
+        title: Text(appBarTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
         backgroundColor: appBarColor,
         foregroundColor: Colors.white,
       ),
@@ -292,13 +303,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     !_isLoadingExistingCart) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (snapshot.hasError)
+                if (snapshot.hasError) {
                   return Center(child: Text('Lỗi: ${snapshot.error}'));
+                }
 
                 if (snapshot.connectionState == ConnectionState.done) {
                   final menuItems = snapshot.data ?? [];
-                  if (menuItems.isEmpty)
+                  if (menuItems.isEmpty) {
                     return const Center(child: Text('Thực đơn trống.'));
+                  }
 
                   final filteredItems = _searchQuery.isEmpty
                       ? menuItems
@@ -310,8 +323,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             )
                             .toList();
 
-                  if (filteredItems.isEmpty)
+                  if (filteredItems.isEmpty) {
                     return const Center(child: Text('Không tìm thấy món.'));
+                  }
 
                   final foodItems = filteredItems
                       .where((item) => item.category == MenuItemCategory.food)
@@ -513,11 +527,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildCartSummaryBar(bool isAddingMore) {
-    if (_isProcessingOrder)
+    if (_isProcessingOrder) {
       return Container(
         padding: const EdgeInsets.all(24),
         child: const Center(child: CircularProgressIndicator()),
       );
+    }
     if (_cart.isEmpty) return const SizedBox.shrink();
 
     final int totalItems = _cart.values.fold(
@@ -542,26 +557,36 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Tổng ($totalItems món):',
-                style: const TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-              Text(
-                formatCurrency(_totalPrice),
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.deepPurple,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Tổng ($totalItems món):',
+                  style: const TextStyle(fontSize: 14, color: Colors.grey),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+                Text(
+                  formatCurrency(_totalPrice),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.deepPurple,
+                  ),
+                ),
+              ],
+            ),
           ),
+          const SizedBox(width: 12),
           ElevatedButton.icon(
             icon: const Icon(Icons.check_circle),
-            label: Text(buttonText),
+            label: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(buttonText, maxLines: 1),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: buttonColor,
               foregroundColor: Colors.white,

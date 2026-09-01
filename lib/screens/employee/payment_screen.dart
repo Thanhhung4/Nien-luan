@@ -12,7 +12,7 @@ import '../../providers/cart_provider.dart';
 class PaymentScreen extends StatefulWidget {
   final List<CartItem> cartItems;
 
-  const PaymentScreen({Key? key, required this.cartItems}) : super(key: key);
+  const PaymentScreen({super.key, required this.cartItems});
 
   @override
   State<PaymentScreen> createState() => _PaymentScreenState();
@@ -130,6 +130,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
       }
       print('All order items created');
 
+      // Trừ kho nguyên liệu sau khi thanh toán
+      final itemsInOrder = await _pbService.getOrderItemsWithDetails(orderId);
+      await _pbService.inventory.deductStockForOrder(itemsInOrder);
+
       // Clear cart thông qua Provider
       if (mounted) {
         context.read<CartProvider>().clear();
@@ -222,7 +226,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       ],
                     ),
                   );
-                }).toList(),
+                }),
 
                 pw.Divider(),
 
@@ -525,7 +529,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         ],
                       )
                     : const Text(
-                        'Xác nhận đã thanh toán',
+                        'Xác nhận thanh toán',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
